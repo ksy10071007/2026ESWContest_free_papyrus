@@ -1,0 +1,5 @@
+name,role,host,user,ssh_port,api_port,project_dir,enabled,identity_file,platform
+jetson-head,head,127.0.0.1,jetson_orin_nano,22,8000,/home/jetson_orin_nano/project/llm/local_llm_bench,true,,jetson
+jetson-worker-01,worker,192.168.0.27,jetson_orin_nano,22,8000,/home/jetson_orin_nano/project/llm/local_llm_bench,false,,auto
+jetson-worker-02,worker,192.168.0.28,jetson_orin_nano,22,8000,/home/jetson_orin_nano/project/llm/local_llm_bench,false,,auto
+jetson-worker-03,worker,192.168.0.29,jetson_orin_nano,22,8000,/home/jetson_orin_nano/project/llm/local_llm_bench,false,,auto

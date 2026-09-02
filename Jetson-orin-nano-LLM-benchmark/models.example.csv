@@ -1,0 +1,10 @@
+name,path,n_gpu_layers,n_ctx,max_tokens
+llama3_8b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/llama3-8b/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf,20,1024,128
+llama3_2_3b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/llama3.2-3b/Llama-3.2-3B-Instruct-Q4_K_M.gguf,20,1024,128
+llama3_2_1b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/llama3.2-1b/Llama-3.2-1B-Instruct-Q4_K_M.gguf,30,1024,128
+qwen2_5_3b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/qwen2.5-3b/Qwen2.5-3B-Instruct-Q4_K_M.gguf,20,1024,128
+qwen2_5_1_5b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/qwen2.5-1.5b/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf,30,1024,128
+deepseek_r1_1_5b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/deepseek-r1-1.5b/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf,30,1024,256
+deepseek_r1_7b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/deepseek-r1-7b/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf,15,1024,256
+gemma2_2b_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/gemma2-2b/gemma-2-2b-it-Q4_K_M.gguf,8,1024,128
+phi3_mini_q4,/home/jetson_orin_nano/llm/local_llm_bench/models/phi3-mini/Phi-3-mini-4k-instruct-Q4_K_M.gguf,8,1024,128

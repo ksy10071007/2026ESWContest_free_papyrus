@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MediFlow Cluster Lab</title>
+  <meta name="description" content="Jetson head/worker LLM 클러스터를 구성하고 벤치마크하는 내부 대시보드">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="주요 메뉴">
+      <a class="brand" href="#overview" aria-label="MediFlow Cluster Lab 홈">
+        <span class="brand-mark">M</span>
+        <span><strong>MediFlow</strong><small>CLUSTER LAB</small></span>
+      </a>
+      <nav class="nav-list">
+        <a class="nav-link active" href="#overview" data-section="overview"><span>01</span>개요</a>
+        <a class="nav-link" href="#nodes" data-section="nodes"><span>02</span>노드</a>
+        <a class="nav-link" href="#experiment" data-section="experiment"><span>03</span>실험 설계</a>
+        <a class="nav-link" href="#runs" data-section="runs"><span>04</span>실행 기록</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="live-indicator"><i></i><span id="streamLabel">연결 준비 중</span></div>
+        <p>HEAD CONTROL PLANE</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">JETSON + RASPBERRY PI · EDGE INFERENCE</p>
+          <h1>LLM Cluster Observatory</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="timestamp" id="lastUpdated">상태 확인 중</span>
+          <button class="icon-button" id="refreshButton" type="button" title="상태 새로고침" aria-label="상태 새로고침">↻</button>
+          <button class="icon-button" id="settingsButton" type="button" title="클러스터 설정" aria-label="클러스터 설정">⚙</button>
+          <button class="button secondary" id="addNodeButton" type="button">+ 워커 연결</button>
+        </div>
+      </header>
+
+      <section id="overview" class="section hero-section">
+        <div class="hero-copy">
+          <span class="section-kicker">LIVE TESTBED</span>
+          <h2>작은 엣지 노드를<br><em>하나의 실험실처럼.</em></h2>
+          <p>연결된 Jetson과 Raspberry Pi의 상태를 확인하고, 참여 노드를 골라 동일 모델과 파라미터로 재현 가능한 LLM 부하 실험을 실행합니다.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#experiment">새 실험 설계</a>
+            <button class="button ghost" id="quickHealthButton" type="button">환경 점검 실행</button>
+          </div>
+        </div>
+        <div class="cluster-orbit" aria-label="현재 클러스터 요약">
+          <div class="orbit-ring ring-one"></div>
+          <div class="orbit-ring ring-two"></div>
+          <div class="core-node">
+            <span>HEAD</span>
+            <strong id="headStatus">—</strong>
+            <small>192.168.0.26</small>
+          </div>
+          <div class="satellite sat-one"><i></i><span>W01</span></div>
+          <div class="satellite sat-two"><i></i><span>W02</span></div>
+          <div class="satellite sat-three"><i></i><span>W03</span></div>
+          <div class="orbit-caption"><span id="onlineCount">0</span> / <span id="enabledCount">1</span> ONLINE</div>
+        </div>
+      </section>
+
+      <section class="metric-strip" aria-label="클러스터 주요 지표">
+        <article><span>참여 노드</span><strong id="selectedCount">1</strong><small>SELECTED</small></article>
+        <article><span>설치 모델</span><strong id="modelCount">—</strong><small>GGUF · HEAD</small></article>
+        <article><span>클러스터 전력</span><strong id="averagePower">—</strong><small>SUM · WATTS</small></article>
+        <article><span>최근 처리량</span><strong id="recentThroughput">—</strong><small>TOKENS / SEC</small></article>
+      </section>
+
+      <section id="nodes" class="section panel-section">
+        <div class="section-heading">
+          <div><span class="section-index">02 / NODES</span><h2>클러스터 토폴로지</h2></div>
+          <div class="heading-actions">
+            <div class="segmented" aria-label="빠른 노드 선택">
+              <button type="button" data-preset="1">1대</button>
+              <button type="button" data-preset="2">2대</button>
+              <button type="button" data-preset="4">4대</button>
+            </div>
+            <button class="button ghost compact" id="checkEnvironmentButton" type="button">선택 노드 환경 점검</button>
+            <button class="button secondary compact" id="installEnvironmentButton" type="button">선택 노드 자동 구성</button>
+          </div>
+        </div>
+        <div class="node-grid" id="nodeGrid">
+          <div class="skeleton-card"></div><div class="skeleton-card"></div>
+        </div>
+        <div class="node-actions-bar">
+          <div><strong id="selectionSummary">선택 노드 1대</strong><span>실험과 제어 작업은 선택한 노드에만 적용됩니다.</span></div>
+          <div>
+            <button class="button ghost compact" data-cluster-action="sync-code" type="button">코드 동기화</button>
+            <button class="button ghost compact" data-cluster-action="sync-models" type="button">선택 모델 동기화</button>
+            <button class="button ghost compact" data-cluster-action="start" type="button">서버 시작</button>
+            <button class="button ghost compact danger-text" data-cluster-action="stop" type="button">서버 중지</button>
+          </div>
+        </div>
+        <section class="environment-workbench" aria-labelledby="environmentWorkbenchTitle">
+          <div class="environment-workbench-head">
+            <div>
+              <span class="section-index">LLM RUNTIME READINESS</span>
+              <h3 id="environmentWorkbenchTitle">노드 실행 환경</h3>
+              <p>운영체제·가속기·백엔드·프로젝트 가상환경과 모델 접근 가능 여부를 노드별로 확인합니다.</p>
+            </div>
+            <div class="environment-summary" id="environmentSummary" aria-live="polite">
+              <span><strong>0</strong> READY</span><span><strong>0</strong> ACTION NEEDED</span>
+            </div>
+          </div>
+          <div class="environment-action-strip">
+            <div class="environment-progress-copy"><i id="environmentStateDot"></i><span id="environmentPhase">환경 점검 대기</span></div>
+            <div>
+              <button class="button ghost compact" id="environmentCheckAllButton" type="button">선택 노드 다시 점검</button>
+              <button class="button primary compact" id="environmentInstallAllButton" type="button">선택 노드 자동 구성</button>
+            </div>
+          </div>
+          <div class="environment-log" id="environmentLog" aria-live="polite" aria-label="노드 환경 작업 로그">
+            <p><time>READY</time>노드를 선택한 뒤 환경을 점검하세요. 설치 가능한 항목은 프로젝트 전용 가상환경에 구성합니다.</p>
+          </div>
+          <p class="environment-footnote">자동 구성은 비밀번호·토큰·SSH 키를 저장하지 않습니다. 시스템 패키지는 고정 허용 목록과 <code>sudo -n</code>에서만 설치하며, 승인이 필요하면 해당 노드에서 실행할 명령만 안내합니다.</p>
+        </section>
+      </section>
+
+      <section id="experiment" class="section experiment-section">
+        <div class="section-heading light-heading">
+          <div><span class="section-index">03 / EXPERIMENT</span><h2>실험 설계</h2></div>
+          <span class="form-status" id="configValidity">설정 준비됨</span>
+        </div>
+        <form id="experimentForm" class="experiment-layout">
+          <div class="form-main">
+            <div class="field full-field">
+              <label for="experimentGroupSelect">실험 묶음</label>
+              <div class="select-wrap"><select id="experimentGroupSelect" name="experiment_id"><option value="">+ 새 실험 만들기</option></select></div>
+              <small>기존 실험을 선택하면 설정과 결과가 같은 실험 ID로 연결됩니다.</small>
+            </div>
+            <div class="field full-field">
+              <label for="experimentName">실험 이름</label>
+              <input id="experimentName" name="name" value="cluster-load-test" required>
+            </div>
+            <div class="field full-field">
+              <label for="modelSearchInput">모델 · 여러 개 선택 시 순서대로 실행</label>
+              <div class="model-picker" id="modelPicker">
+                <div class="model-picker-search"><input id="modelSearchInput" type="search" autocomplete="off" placeholder="설치된 GGUF 모델 검색" aria-controls="modelChecklist"><span id="modelSelectionCount">0개 선택</span></div>
+                <div class="model-chips" id="modelChips" aria-live="polite"></div>
+                <div class="model-picker-tools"><button type="button" id="selectAllModelsButton">검색 결과 전체 선택</button><button type="button" id="clearModelsButton">선택 해제</button></div>
+                <div class="model-checklist" id="modelChecklist" role="group" aria-label="벤치마크할 모델 선택"></div>
+              </div>
+              <select id="modelSelect" name="model_id" hidden aria-hidden="true"></select>
+              <small id="modelHint">head 노드에 설치된 GGUF 모델</small>
+            </div>
+            <fieldset class="strategy-fieldset">
+              <legend>실행 방식</legend>
+              <p class="strategy-intro">같은 노드를 선택해도 모델을 어디에 두고 요청을 어떻게 보내는지에 따라 전혀 다른 실험입니다. 효율과 무관하게 검증하려는 방식을 직접 선택하세요.</p>
+              <div class="strategy-grid" id="strategyGrid">
+                <label class="strategy-card">
+                  <input type="radio" name="execution_strategy" value="single_node">
+                  <span class="strategy-card-top"><b>01</b><strong>단일 노드 기준선</strong></span>
+                  <span><em>모델 배치</em> 첫 번째 노드에 모델 1개</span>
+                  <span><em>요청 흐름</em> 모든 입력을 그 노드 하나가 처리</span>
+                  <small>목적 · 클러스터 효과를 비교할 기준 성능 측정</small>
+                  <small class="strategy-caution">제약 · 정확히 1대만 선택해 실행</small>
+                </label>
+                <label class="strategy-card">
+                  <input type="radio" name="execution_strategy" value="replicated_round_robin" checked>
+                  <span class="strategy-card-top"><b>02</b><strong>복제 · 요청 분산</strong></span>
+                  <span><em>모델 배치</em> 각 노드에 같은 모델 전체 복제</span>
+                  <span><em>요청 흐름</em> 입력을 노드에 번갈아 한 번씩 전달</span>
+                  <small>목적 · 여러 사용자 처리량과 수평 확장성 측정</small>
+                  <small class="strategy-caution">주의 · 모델 전체가 각 노드 메모리에 들어가야 함</small>
+                </label>
+                <label class="strategy-card">
+                  <input type="radio" name="execution_strategy" value="broadcast_compare">
+                  <span class="strategy-card-top"><b>03</b><strong>전체 동시 전송</strong></span>
+                  <span><em>모델 배치</em> 각 노드에 같은 모델 전체 복제</span>
+                  <span><em>요청 흐름</em> 같은 입력을 모든 노드에 동시에 전달</span>
+                  <small>목적 · 동일 입력에서 노드별 속도·응답 일치성 비교</small>
+                  <small class="strategy-caution">주의 · 실제 호출과 생성 답변이 노드 수만큼 증가</small>
+                </label>
+                <label class="strategy-card">
+                  <input type="radio" name="execution_strategy" value="node_sweep">
+                  <span class="strategy-card-top"><b>04</b><strong>노드 수 스윕</strong></span>
+                  <span><em>모델 배치</em> 비교 대상 노드마다 모델 전체 복제</span>
+                  <span><em>요청 흐름</em> 1대부터 선택한 수까지 반복 측정</span>
+                  <small>목적 · 노드 추가에 따른 확장 곡선 직접 검증</small>
+                  <small class="strategy-caution">주의 · 선택 노드 수만큼 측정 단계를 반복</small>
+                </label>
+                <label class="strategy-card experimental-card">
+                  <input type="radio" name="execution_strategy" value="model_parallel_rpc">
+                  <span class="strategy-card-top"><b>05</b><strong>모델 분할 · RPC</strong><i>EXPERIMENTAL</i></span>
+                  <span><em>모델 배치</em> 모델 하나의 텐서를 여러 노드에 분할</span>
+                  <span><em>요청 흐름</em> 한 답변 계산에 선택 노드 모두 참여</span>
+                  <small>목적 · 단일 노드에 안 들어가는 모델과 분산 추론 검증</small>
+                  <small class="strategy-caution">주의 · 모든 노드와 네트워크가 한 답변의 병목이 됨</small>
+                </label>
+              </div>
+            </fieldset>
+            <div class="strategy-options" id="sweepOptions" hidden>
+              <div class="strategy-options-head"><div><strong>노드 스윕 범위</strong><small>선택 순서를 기준으로 측정 단계를 구성합니다.</small></div></div>
+              <div class="field">
+                <label for="sweepModeSelect">스윕 모드</label>
+                <div class="select-wrap"><select id="sweepModeSelect" name="sweep_mode"><option value="cumulative">누적 · 1대, 2대, … N대</option><option value="individual">개별 · 각 노드 1대씩</option></select></div>
+              </div>
+            </div>
+            <div class="strategy-options rpc-options" id="rpcOptions" hidden>
+              <div class="strategy-options-head"><div><strong>모델 분할 RPC 설정</strong><small>GGUF 한 개를 분할해 한 번의 생성에 여러 장치를 사용합니다.</small></div><span>실험 기능</span></div>
+              <div class="rpc-warning"><strong>성능 향상을 보장하지 않습니다.</strong> coordinator인 head 1대와 worker 1대 이상을 함께 선택해야 합니다. 네트워크 전송과 동기화 비용 때문에 단일 노드보다 느릴 수 있으며, 연결이 끊기면 해당 답변 전체가 실패합니다. RPC 포트는 인증 기능이 없어 신뢰 LAN에서 워커 API 보안 설정이 꺼진 동안에만 실행됩니다.</div>
+              <div class="rpc-option-grid">
+                <div class="field"><label for="rpcSplitModeSelect">분할 단위</label><div class="select-wrap"><select id="rpcSplitModeSelect" name="rpc_split_mode"><option value="layer">레이어 분할</option><option value="row">텐서 행 분할</option></select></div></div>
+                <div class="field"><label for="rpcSplitPolicySelect">분할 비율</label><div class="select-wrap"><select id="rpcSplitPolicySelect" name="rpc_split_policy"><option value="auto">자동 · 장치 메모리 기준</option><option value="equal">균등 분할</option><option value="custom">직접 입력</option></select></div></div>
+                <div class="field full-field" id="rpcTensorField" hidden><label for="rpcTensorSplitInput">노드별 비율</label><input id="rpcTensorSplitInput" name="rpc_tensor_split" inputmode="decimal" placeholder="예: 1, 1, 2"><small>선택 노드 순서대로 양수를 쉼표로 구분합니다. JSON에는 숫자 배열로 저장됩니다.</small></div>
+              </div>
+              <label class="rpc-acknowledge"><input id="rpcAcknowledgeInput" name="acknowledge_experimental_rpc" type="checkbox"><span></span><div><strong>실험적 분산 추론임을 이해했습니다</strong><small>네트워크 병목, 불안정성, 성능 저하 가능성을 포함해 결과 자체를 검증 대상으로 취급합니다.</small></div></label>
+              <button class="button ghost compact" id="prepareRpcButton" type="button">선택 노드 RPC 환경 준비</button>
+            </div>
+            <section class="strategy-formula" aria-live="polite" aria-atomic="true">
+              <div class="strategy-formula-head"><span>EXECUTION PLAN</span><strong id="strategyFormulaTitle">복제 · 요청 분산</strong></div>
+              <div class="strategy-formula-grid suite-formula-grid">
+                <div><small>MODELS</small><strong id="formulaModels">1</strong></div>
+                <div><small>MODEL COPIES</small><strong id="formulaModelCopies">1</strong></div>
+                <div><small>NODES / ANSWER</small><strong id="formulaNodesPerAnswer">1</strong></div>
+                <div><small>LOGICAL REQUESTS</small><strong id="formulaLogicalRequests">20</strong></div>
+                <div><small>PHYSICAL CALLS</small><strong id="formulaPhysicalCalls">20</strong></div>
+                <div><small>TOTAL CALLS</small><strong id="formulaTotalCalls">20</strong></div>
+              </div>
+              <p id="strategyFormulaExplanation">모델을 노드마다 복제하고 사용자 요청은 한 노드씩 분배합니다.</p>
+            </section>
+            <div class="parameter-grid">
+              <div class="field"><label for="requestsInput">총 요청</label><input id="requestsInput" name="requests" type="number" min="1" max="10000" value="20"></div>
+              <div class="field"><label for="concurrencyInput">동시성</label><input id="concurrencyInput" name="concurrency" type="number" min="1" max="256" value="4"></div>
+              <div class="field"><label for="maxTokensInput">생성 토큰</label><input id="maxTokensInput" name="max_tokens" type="number" min="1" max="1024" value="128"></div>
+              <div class="field"><label for="contextInput">컨텍스트</label><input id="contextInput" name="n_ctx" type="number" min="128" max="4096" step="128" value="1024"></div>
+              <div class="field"><label for="layersInput">GPU 레이어</label><input id="layersInput" name="n_gpu_layers" type="number" min="0" max="120" value="30"></div>
+              <div class="field"><label for="warmupInput">워밍업/노드</label><input id="warmupInput" name="warmup_requests" type="number" min="0" max="10" value="1"></div>
+              <div class="field range-field"><label for="temperatureInput">Temperature <output id="temperatureValue">0.0</output></label><input id="temperatureInput" name="temperature" type="range" min="0" max="2" step="0.1" value="0"></div>
+              <div class="field range-field"><label for="topPInput">Top-p <output id="topPValue">0.9</output></label><input id="topPInput" name="top_p" type="range" min="0" max="1" step="0.05" value="0.9"></div>
+              <div class="field"><label for="seedInput">Seed</label><input id="seedInput" name="seed" type="number" min="-1" max="2147483647" value="42"></div>
+              <div class="field"><label for="modelCooldownInput">모델 교체 대기</label><input id="modelCooldownInput" name="model_cooldown_s" type="number" min="0" max="300" step="1" value="3"><small>모델 사이 정리 시간 · 초</small></div>
+              <label class="toggle-field"><input id="uniformInput" name="require_uniform_config" type="checkbox" checked><span></span><div><strong>동일 구성 강제</strong><small>자동 하향 조정 시 실험 중단</small></div></label>
+              <label class="toggle-field"><input id="continueModelErrorInput" name="continue_on_model_error" type="checkbox" checked><span></span><div><strong>모델 실패 후 계속</strong><small>다음 모델 벤치마크 진행</small></div></label>
+            </div>
+            <div class="field full-field prompt-field">
+              <label for="promptInput">테스트 프롬프트</label>
+              <textarea id="promptInput" name="prompt" rows="5" required></textarea>
+              <small><span id="promptLength">0</span>자 · 모든 요청에 같은 프롬프트 사용</small>
+            </div>
+          </div>
+          <aside class="run-console">
+            <div class="console-head"><span>RUN CONTROL</span><span class="console-strategy" id="runStrategyBadge">복제 · 요청 분산</span><i id="runStateDot"></i></div>
+            <div class="run-summary">
+              <div><small>NODES</small><strong id="runNodes">1</strong></div>
+              <div><small>REQUESTS</small><strong id="runRequests">20</strong></div>
+              <div><small>CONCURRENCY</small><strong id="runConcurrency">4</strong></div>
+            </div>
+            <div class="progress-block">
+              <div><span id="runPhase">실행 대기</span><strong id="runProgressText">0%</strong></div>
+              <div class="progress-track"><i id="runProgressBar"></i></div>
+            </div>
+            <div class="console-log" id="consoleLog" aria-live="polite">
+              <p><time>READY</time> 노드와 파라미터를 설정하세요.</p>
+            </div>
+            <button class="button primary run-button" id="runButton" type="submit">벤치마크 시작 <span>→</span></button>
+            <button class="button danger run-button hidden" id="cancelButton" type="button">실험 취소</button>
+          </aside>
+        </form>
+      </section>
+
+      <section id="runs" class="section panel-section runs-section">
+        <div class="section-heading">
+          <div><span class="section-index">04 / RESULTS</span><h2>실험별 결과</h2></div>
+          <div class="results-filter"><label for="resultExperimentFilter">실험 선택</label><select id="resultExperimentFilter"><option value="all">전체 실험</option></select></div>
+        </div>
+        <div class="experiment-context" id="experimentContext">모든 실험의 실행 기록을 표시합니다.</div>
+        <div class="result-highlight" id="resultHighlight">
+          <div class="empty-result"><strong>아직 완료된 클러스터 실험이 없습니다.</strong><span>첫 실험을 실행하면 처리량과 지연 지표가 여기에 표시됩니다.</span></div>
+        </div>
+        <div class="chart-grid" id="chartGrid" hidden>
+          <article class="chart-card chart-wide" data-chart-card="throughputChart">
+            <div class="chart-card-head"><div class="chart-heading"><span>THROUGHPUT TREND</span><strong>반복 실행 처리량</strong></div><div class="chart-actions"><button type="button" data-chart-png="throughputChart" title="대시보드 테마 PNG 다운로드">PNG <b>↓</b></button><button type="button" data-paper-export="throughputChart" title="논문용 SVG 또는 고해상도 PNG 만들기">논문용 <b>↗</b></button></div></div>
+            <div class="chart-stage"><canvas id="throughputChart" height="260" tabindex="0" role="img" aria-label="실행별 클러스터 토큰 처리량 그래프. 화살표 키로 데이터 지점을 탐색할 수 있습니다." aria-describedby="throughputChartHint"></canvas><div class="chart-tooltip" id="throughputChartTooltip" role="status" hidden></div></div>
+            <div class="chart-footer"><div class="chart-legend" id="throughputChartLegend" aria-label="처리량 그래프 범례"></div><small id="throughputChartHint">포인터를 올리거나 ← → 키로 값을 확인하세요.</small></div>
+          </article>
+          <article class="chart-card" data-chart-card="latencyChart">
+            <div class="chart-card-head"><div class="chart-heading"><span>LATENCY</span><strong>TTFT / E2E 비교</strong></div><div class="chart-actions"><button type="button" data-chart-png="latencyChart" title="대시보드 테마 PNG 다운로드">PNG <b>↓</b></button><button type="button" data-paper-export="latencyChart" title="논문용 SVG 또는 고해상도 PNG 만들기">논문용 <b>↗</b></button></div></div>
+            <div class="chart-stage"><canvas id="latencyChart" height="260" tabindex="0" role="img" aria-label="실행별 TTFT와 E2E 지연 그래프. 화살표 키로 막대를 탐색할 수 있습니다." aria-describedby="latencyChartHint"></canvas><div class="chart-tooltip" id="latencyChartTooltip" role="status" hidden></div></div>
+            <div class="chart-footer"><div class="chart-legend" id="latencyChartLegend" aria-label="지연 그래프 범례"></div><small id="latencyChartHint">범례를 눌러 지표를 숨기거나 다시 표시할 수 있습니다.</small></div>
+          </article>
+          <article class="chart-card" data-chart-card="nodeChart">
+            <div class="chart-card-head"><div class="chart-heading"><span>LATEST RUN</span><strong id="nodeChartTitle">노드별 기여도</strong></div><div class="chart-actions"><button type="button" data-chart-png="nodeChart" title="대시보드 테마 PNG 다운로드">PNG <b>↓</b></button><button type="button" data-paper-export="nodeChart" title="논문용 SVG 또는 고해상도 PNG 만들기">논문용 <b>↗</b></button></div></div>
+            <div class="chart-stage"><canvas id="nodeChart" height="260" tabindex="0" role="img" aria-label="최근 실행의 전략별 상세 처리량 그래프. 화살표 키로 막대를 탐색할 수 있습니다." aria-describedby="nodeChartHint"></canvas><div class="chart-tooltip" id="nodeChartTooltip" role="status" hidden></div></div>
+            <div class="chart-footer"><div class="chart-legend" id="nodeChartLegend" aria-label="상세 그래프 범례"></div><small id="nodeChartHint">최근 실행의 동일 전략 측정값만 표시합니다.</small></div>
+          </article>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>실험</th><th>모델 / Suite</th><th>실행 방식</th><th>노드</th><th>성공률</th><th>TTFT p50</th><th>E2E p95</th><th>처리량</th><th>상태</th></tr></thead>
+            <tbody id="runsTable"><tr><td colspan="9" class="empty-cell">실행 기록 없음</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer><span>MediFlow Cluster Lab</span><span>Internal LAN · Reproducible Edge LLM Evaluation</span></footer>
+    </main>
+  </div>
+
+  <dialog id="nodeDialog" class="modal">
+    <form id="nodeForm" method="dialog">
+      <div class="modal-head"><div><span class="section-index">WORKER ONBOARDING</span><h2>엣지 워커 찾기</h2></div><button type="button" class="close-button" data-close-dialog aria-label="닫기">×</button></div>
+      <p class="modal-intro">Head와 같은 사설 LAN에서 SSH가 열린 기기를 찾습니다. 기기를 선택한 뒤 공개 키 인증과 Jetson/Pi 환경을 확인하고 자동 준비합니다.</p>
+      <div class="device-discovery">
+        <div><strong>연결된 기기</strong><span id="scanStatus">검색을 시작하세요.</span><button type="button" class="button secondary compact" id="scanNetworkButton">기기 다시 검색</button></div>
+        <div class="device-list" id="deviceList"><div class="device-empty">아직 검색하지 않았습니다.</div></div>
+      </div>
+      <div class="modal-grid">
+        <div class="field"><label for="nodeName">노드 이름</label><input id="nodeName" required placeholder="jetson-worker-01"></div>
+        <div class="field"><label for="nodePlatform">플랫폼</label><select id="nodePlatform"><option value="auto">자동 감지</option><option value="jetson">NVIDIA Jetson</option><option value="raspberry-pi">Raspberry Pi 5</option></select></div>
+        <div class="field"><label for="nodeHost">선택된 IP 주소</label><input id="nodeHost" required placeholder="기기를 선택하거나 직접 입력"></div>
+        <div class="field"><label for="nodeUser">SSH 사용자</label><input id="nodeUser" required value="jetson_orin_nano"></div>
+        <div class="field"><label for="nodeSshPort">SSH 포트</label><input id="nodeSshPort" type="number" min="1" max="65535" value="22"></div>
+        <div class="field"><label for="nodeApiPort">API 포트</label><input id="nodeApiPort" type="number" min="1" max="65535" value="8000"></div>
+        <div class="field full-field"><label for="nodeProjectDir">프로젝트 경로</label><input id="nodeProjectDir" required value="/home/jetson_orin_nano/project/llm/local_llm_bench"></div>
+      </div>
+      <div class="key-panel"><span>HEAD SSH PUBLIC KEY</span><code id="publicKey">키가 아직 생성되지 않았습니다.</code><button type="button" id="copyKeyButton">복사</button></div>
+      <p class="pairing-note">최초 한 번 이 키를 워커의 <code>~/.ssh/authorized_keys</code>에 등록해야 합니다. SSH 또는 sudo 비밀번호는 대시보드가 받거나 저장하지 않습니다.</p>
+      <div class="probe-result" id="probeResult" hidden></div>
+      <div class="modal-actions"><button type="button" class="button ghost" data-close-dialog>취소</button><button type="button" class="button secondary" id="probeNodeButton">SSH 환경 확인</button><button type="submit" class="button primary" id="savePrepareButton">저장 후 자동 준비</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="nodeDetailDialog" class="modal node-detail-modal">
+    <div class="node-detail-shell">
+      <div class="modal-head"><div><span class="section-index">LIVE NODE TELEMETRY</span><h2 id="detailNodeName">노드 상태</h2></div><button type="button" class="close-button" data-close-dialog aria-label="닫기">×</button></div>
+      <div id="nodeDetailContent"></div>
+    </div>
+  </dialog>
+
+  <dialog id="authDialog" class="modal auth-modal">
+    <form id="authForm" method="dialog">
+      <div class="modal-head"><div><span class="section-index">SECURE ACCESS</span><h2>대시보드 토큰</h2></div></div>
+      <p class="modal-intro">head 노드의 <code>.run/cluster/dashboard.token</code> 값을 입력하세요. 브라우저에만 저장됩니다.</p>
+      <div class="field"><label for="tokenInput">Access token</label><input id="tokenInput" type="password" required autocomplete="off"></div>
+      <div class="modal-actions"><button type="submit" class="button primary">대시보드 연결</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="modal settings-modal">
+    <form id="settingsForm" method="dialog">
+      <div class="modal-head"><div><span class="section-index">CLUSTER SETTINGS</span><h2>클러스터 설정</h2></div><button type="button" class="close-button" data-close-dialog aria-label="닫기">×</button></div>
+      <p class="modal-intro">신뢰할 수 있는 로컬 네트워크에서는 대시보드와 워커 API 인증을 모두 꺼둘 수 있습니다. 여러 사용자가 같은 LAN을 쓰거나 외부 접근 가능성이 있으면 필요한 보호 기능을 켜세요.</p>
+      <label class="settings-toggle">
+        <input id="dashboardAuthInput" type="checkbox">
+        <span></span>
+        <div><strong>대시보드 토큰 인증</strong><small>대시보드의 상태 조회, 노드 관리와 실험 API 접근을 토큰으로 보호</small></div>
+      </label>
+      <div class="settings-notice" id="dashboardAuthNotice">현재 꺼짐 · 토큰 없이 대시보드 접속</div>
+      <div class="field settings-token-field" id="dashboardTokenField" hidden>
+        <label for="dashboardTokenInput">현재 대시보드 토큰</label>
+        <input id="dashboardTokenInput" type="password" maxlength="256" autocomplete="off" placeholder=".run/cluster/dashboard.token 값">
+        <small>보안을 켜는 순간 브라우저가 잠기지 않도록 기존 토큰을 한 번 확인합니다. 설정 파일에는 저장하지 않습니다.</small>
+      </div>
+      <label class="settings-toggle">
+        <input id="workerAuthInput" type="checkbox">
+        <span></span>
+        <div><strong>워커 API 토큰 인증</strong><small>상태 조회, 모델 변경, 추론 요청을 head/worker 공유 토큰으로 보호</small></div>
+      </label>
+      <div class="settings-notice" id="workerAuthNotice">현재 꺼짐 · 신뢰 LAN 전용 모드</div>
+      <p class="settings-help">워커 API 인증을 변경할 때만 연결된 노드 API가 자동 재시작됩니다. 대시보드 인증은 즉시 적용되며 기본값은 꺼짐입니다. 워커 보안이 켜진 동안에는 인증되지 않은 llama.cpp RPC 모델 분할 실험이 차단됩니다.</p>
+      <div class="modal-actions"><button type="button" class="button ghost" data-close-dialog>취소</button><button type="submit" class="button primary">설정 저장 및 적용</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="publicationDialog" class="modal publication-modal">
+    <form id="publicationForm" method="dialog">
+      <div class="modal-head"><div><span class="section-index">PUBLICATION EXPORT</span><h2>논문용 그래프 만들기</h2></div><button type="button" class="close-button" data-close-dialog aria-label="닫기">×</button></div>
+      <p class="modal-intro">대시보드 장식을 제거하고 흰 배경, 색각 이상 친화 팔레트, 명확한 축과 단위로 다시 그립니다. SVG는 벡터 편집에, PNG는 원고에 바로 삽입할 때 적합합니다.</p>
+      <div class="publication-source"><span>선택 그래프</span><strong id="publicationChartName">—</strong><small id="publicationStrategy">—</small></div>
+      <div class="modal-grid publication-grid">
+        <div class="field full-field"><label for="publicationTitleInput">그림 제목</label><input id="publicationTitleInput" maxlength="140"></div>
+        <div class="field"><label for="publicationFormatSelect">파일 형식</label><select id="publicationFormatSelect"><option value="svg">SVG · 벡터 권장</option><option value="png">PNG · 고해상도</option></select></div>
+        <div class="field"><label for="publicationSizeSelect">논문 지면 폭</label><select id="publicationSizeSelect"><option value="one">1단 · 85 mm</option><option value="two">2단 · 180 mm</option></select></div>
+        <div class="field" id="publicationDpiField"><label for="publicationDpiSelect">PNG 해상도</label><select id="publicationDpiSelect"><option value="300">300 DPI · 표준</option><option value="600">600 DPI · 인쇄용</option></select></div>
+        <label class="publication-check"><input id="publicationIncludeTitle" type="checkbox" checked><span></span><div><strong>그림 안에 제목 포함</strong><small>저널 지침이 캡션만 요구하면 해제하세요.</small></div></label>
+        <label class="publication-check"><input id="publicationShowValues" type="checkbox"><span></span><div><strong>측정값 직접 표시</strong><small>데이터 포인트 위에 수치를 표기합니다.</small></div></label>
+      </div>
+      <div class="publication-spec"><div><span>PALETTE</span><strong>Okabe–Ito</strong><small>색각 이상 친화</small></div><div><span>BACKGROUND</span><strong>#FFFFFF</strong><small>인쇄 최적화</small></div><div><span>OUTPUT</span><strong id="publicationOutputSpec">85 mm · SVG</strong><small id="publicationPixelSpec">벡터 해상도</small></div></div>
+      <p class="publication-note">현재 선택된 실험 방식의 결과만 사용합니다. 서로 의미가 다른 실행 방식은 한 그림에 합치지 않습니다.</p>
+      <div class="modal-actions"><button type="button" class="button ghost" data-close-dialog>취소</button><button type="submit" class="button primary">논문용 파일 다운로드</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

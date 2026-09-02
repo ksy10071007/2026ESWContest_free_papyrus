@@ -1,0 +1,638 @@
+#!/usr/bin/env python3
+"""Safely manage the local LLM cluster head processes.
+
+This command intentionally manages only the fixed dashboard process belonging
+to this project.  It does not use systemd, broad process matching, or shell
+command evaluation.
+"""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import pwd
+import secrets
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
+
+
+PROJECT_NAME = "local-llm-bench"
+COMMAND_NAME = "llm-cluster"
+EXPECTED_USER = "jetson_orin_nano"
+EXPECTED_PROJECT_ROOT = Path("/home/jetson_orin_nano/project/llm/local_llm_bench")
+DASHBOARD_URL = "http://192.168.0.26:8080/"
+
+SCRIPT_PATH = Path(__file__).resolve()
+PROJECT_ROOT = SCRIPT_PATH.parent.parent
+RUN_DIR = PROJECT_ROOT / ".run" / "cluster"
+PYTHON_BIN = PROJECT_ROOT / ".venv" / "bin" / "python"
+LOCK_FILE = RUN_DIR / f"{COMMAND_NAME}.lock"
+ALLOWED_ACTIONS = {"start", "stop", "restart", "status", "logs"}
+LOCK_TIMEOUT_SECONDS = 30.0
+START_TIMEOUT_SECONDS = 20.0
+TERM_TIMEOUT_SECONDS = 10.0
+KILL_TIMEOUT_SECONDS = 3.0
+LOG_LINES = 200
+
+
+class LauncherError(RuntimeError):
+    """A safe, user-facing launcher failure."""
+
+
+@dataclass(frozen=True)
+class ProcessSpec:
+    name: str
+    module: str
+    host: str
+    port: int
+    health_path: str
+    pid_file: Path
+    log_file: Path
+    identity_file: Path
+    access_log: bool
+
+    @property
+    def argv(self) -> List[str]:
+        args = [
+            str(PYTHON_BIN),
+            "-m",
+            "uvicorn",
+            f"{self.module}:app",
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
+        ]
+        if not self.access_log:
+            args.append("--no-access-log")
+        return args
+
+
+@dataclass(frozen=True)
+class ProcessIdentity:
+    component: str
+    pid: int
+    uid: int
+    start_ticks: int
+    exe: str
+    cwd: str
+    argv: Tuple[str, ...]
+
+    def as_record(self) -> Dict[str, object]:
+        return {
+            "version": 1,
+            "component": self.component,
+            "pid": self.pid,
+            "uid": self.uid,
+            "start_ticks": self.start_ticks,
+            "exe": self.exe,
+            "cwd": self.cwd,
+            "argv": list(self.argv),
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @property
+    def generation(self) -> Tuple[int, int]:
+        return self.pid, self.start_ticks
+
+
+DASHBOARD = ProcessSpec(
+    name="dashboard",
+    module="cluster.dashboard.app",
+    host="0.0.0.0",
+    port=8080,
+    health_path="/dashboard/health",
+    pid_file=RUN_DIR / "dashboard_8080.pid",
+    log_file=RUN_DIR / "dashboard_8080.log",
+    identity_file=RUN_DIR / "dashboard_8080.identity.json",
+    access_log=False,
+)
+START_ORDER = (DASHBOARD,)
+STOP_ORDER = (DASHBOARD,)
+
+
+def usage() -> str:
+    return f"Usage: {COMMAND_NAME} start|stop|restart|status|logs"
+
+
+def atomic_write(path: Path, content: str, mode: int = 0o600) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp, mode)
+        os.replace(temp, path)
+    finally:
+        try:
+            temp.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def validate_installation() -> int:
+    actual_root = PROJECT_ROOT.resolve()
+    if actual_root != EXPECTED_PROJECT_ROOT:
+        raise LauncherError(
+            f"refusing unexpected project path: {actual_root} "
+            f"(expected {EXPECTED_PROJECT_ROOT})"
+        )
+    try:
+        account = pwd.getpwnam(EXPECTED_USER)
+    except KeyError as exc:
+        raise LauncherError(f"required user does not exist: {EXPECTED_USER}") from exc
+    if os.geteuid() != account.pw_uid or pwd.getpwuid(os.geteuid()).pw_name != EXPECTED_USER:
+        raise LauncherError(f"run this command as {EXPECTED_USER}; sudo is not supported")
+    if not PYTHON_BIN.is_file() or not os.access(PYTHON_BIN, os.X_OK):
+        raise LauncherError(f"virtual environment Python is missing: {PYTHON_BIN}")
+    try:
+        resolved_python = PYTHON_BIN.resolve(strict=True)
+    except OSError as exc:
+        raise LauncherError(f"cannot resolve virtual environment Python: {PYTHON_BIN}") from exc
+    if not resolved_python.is_file():
+        raise LauncherError(f"virtual environment Python target is not a file: {resolved_python}")
+    if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+        raise LauncherError("this Linux/Python runtime lacks the required safe pidfd signal API")
+    return account.pw_uid
+
+
+def prepare_runtime() -> None:
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(RUN_DIR, 0o700)
+    for path in (
+        DASHBOARD.pid_file,
+        DASHBOARD.log_file,
+        DASHBOARD.identity_file,
+    ):
+        if path.exists() and path.is_file():
+            os.chmod(path, 0o600)
+
+
+def acquire_lock() -> int:
+    fd = os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
+    os.fchmod(fd, 0o600)
+    os.set_inheritable(fd, False)
+    deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                os.close(fd)
+                raise LauncherError("another llm-cluster operation is still running")
+            time.sleep(0.1)
+
+
+def read_proc_stat(pid: int) -> Tuple[str, int]:
+    raw = (Path("/proc") / str(pid) / "stat").read_text(encoding="utf-8")
+    close_paren = raw.rfind(")")
+    if close_paren < 0:
+        raise LauncherError(f"cannot parse process stat for PID {pid}")
+    fields = raw[close_paren + 2 :].split()
+    if len(fields) < 20:
+        raise LauncherError(f"incomplete process stat for PID {pid}")
+    return fields[0], int(fields[19])
+
+
+def inspect_expected_process(spec: ProcessSpec, pid: int, expected_uid: int) -> ProcessIdentity:
+    proc = Path("/proc") / str(pid)
+    if not proc.exists():
+        raise ProcessLookupError(pid)
+    stat_result = proc.stat()
+    if stat_result.st_uid != expected_uid:
+        raise LauncherError(f"{spec.name} PID {pid} belongs to a different user")
+    state, start_ticks = read_proc_stat(pid)
+    if state == "Z":
+        raise ProcessLookupError(pid)
+    exe = (proc / "exe").resolve(strict=True)
+    expected_exe = PYTHON_BIN.resolve(strict=True)
+    if exe != expected_exe:
+        raise LauncherError(f"{spec.name} PID {pid} executable does not match this project")
+    cwd = (proc / "cwd").resolve(strict=True)
+    if cwd != PROJECT_ROOT.resolve():
+        raise LauncherError(f"{spec.name} PID {pid} working directory does not match this project")
+    raw_cmdline = (proc / "cmdline").read_bytes()
+    argv = tuple(part.decode("utf-8", errors="surrogateescape") for part in raw_cmdline.split(b"\0") if part)
+    if argv != tuple(spec.argv):
+        raise LauncherError(f"{spec.name} PID {pid} command line does not match the fixed service")
+    return ProcessIdentity(
+        component=spec.name,
+        pid=pid,
+        uid=expected_uid,
+        start_ticks=start_ticks,
+        exe=str(exe),
+        cwd=str(cwd),
+        argv=argv,
+    )
+
+
+def read_pid_file(path: Path) -> Optional[int]:
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    if not value.isascii() or not value.isdigit() or int(value) <= 1:
+        raise LauncherError(f"refusing malformed PID file: {path}")
+    return int(value)
+
+
+def read_identity_record(path: Path) -> Optional[Dict[str, object]]:
+    if not path.exists():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise LauncherError(f"refusing invalid identity file: {path}") from exc
+    if not isinstance(value, dict):
+        raise LauncherError(f"refusing invalid identity file: {path}")
+    return value
+
+
+def identity_record_matches(record: Dict[str, object], identity: ProcessIdentity) -> bool:
+    return (
+        record.get("version") == 1
+        and record.get("component") == identity.component
+        and record.get("pid") == identity.pid
+        and record.get("uid") == identity.uid
+        and record.get("start_ticks") == identity.start_ticks
+        and record.get("exe") == identity.exe
+        and record.get("cwd") == identity.cwd
+        and record.get("argv") == list(identity.argv)
+    )
+
+
+def write_process_records(spec: ProcessSpec, identity: ProcessIdentity) -> None:
+    atomic_write(spec.pid_file, f"{identity.pid}\n")
+    atomic_write(spec.identity_file, json.dumps(identity.as_record(), indent=2, sort_keys=True) + "\n")
+
+
+def clear_process_records(spec: ProcessSpec) -> None:
+    for path in (spec.pid_file, spec.identity_file):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def scan_exact_processes(spec: ProcessSpec, expected_uid: int) -> List[ProcessIdentity]:
+    matches: List[ProcessIdentity] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            identity = inspect_expected_process(spec, int(entry.name), expected_uid)
+        except (LauncherError, OSError, ProcessLookupError, ValueError):
+            continue
+        matches.append(identity)
+    return matches
+
+
+def locate_process(spec: ProcessSpec, expected_uid: int) -> Optional[ProcessIdentity]:
+    pid = read_pid_file(spec.pid_file)
+    if pid is not None:
+        try:
+            identity = inspect_expected_process(spec, pid, expected_uid)
+        except ProcessLookupError:
+            clear_process_records(spec)
+        except OSError as exc:
+            if not (Path("/proc") / str(pid)).exists():
+                clear_process_records(spec)
+            else:
+                raise LauncherError(f"cannot verify {spec.name} PID {pid}: {exc}") from exc
+        else:
+            record = read_identity_record(spec.identity_file)
+            if record is not None and not identity_record_matches(record, identity):
+                raise LauncherError(
+                    f"{spec.name} identity record does not match PID {pid}; no signal was sent"
+                )
+            if record is None:
+                write_process_records(spec, identity)
+            return identity
+
+    matches = scan_exact_processes(spec, expected_uid)
+    if len(matches) > 1:
+        raise LauncherError(f"multiple exact {spec.name} processes found; refusing to choose one")
+    if len(matches) == 1:
+        write_process_records(spec, matches[0])
+        return matches[0]
+    if spec.identity_file.exists():
+        spec.identity_file.unlink()
+    return None
+
+
+def process_environment(spec: ProcessSpec) -> Dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def health_ok(spec: ProcessSpec) -> bool:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{spec.port}{spec.health_path}",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=1.0) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        return False
+    return payload.get("service") == "cluster-dashboard"
+
+
+def port_is_open(port: int) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+            return True
+    except OSError:
+        return False
+
+
+def same_generation_alive(identity: ProcessIdentity) -> bool:
+    proc = Path("/proc") / str(identity.pid)
+    try:
+        if proc.stat().st_uid != identity.uid:
+            return False
+        state, start_ticks = read_proc_stat(identity.pid)
+        return state != "Z" and start_ticks == identity.start_ticks
+    except (OSError, ProcessLookupError, LauncherError, ValueError):
+        return False
+
+
+def open_verified_pidfd(
+    spec: ProcessSpec, identity: ProcessIdentity, expected_uid: int
+) -> int:
+    try:
+        pidfd = os.pidfd_open(identity.pid, 0)
+    except ProcessLookupError:
+        raise
+    try:
+        verified = inspect_expected_process(spec, identity.pid, expected_uid)
+        if verified.generation != identity.generation:
+            raise LauncherError(
+                f"{spec.name} PID generation changed; no signal was sent"
+            )
+        return pidfd
+    except Exception:
+        os.close(pidfd)
+        raise
+
+
+def send_pidfd_signal(pidfd: int, sig: signal.Signals) -> None:
+    try:
+        signal.pidfd_send_signal(pidfd, sig, None, 0)
+    except ProcessLookupError:
+        pass
+
+
+def terminate_identity(
+    spec: ProcessSpec, identity: ProcessIdentity, expected_uid: int
+) -> None:
+    try:
+        pidfd = open_verified_pidfd(spec, identity, expected_uid)
+    except ProcessLookupError:
+        clear_process_records(spec)
+        return
+    try:
+        send_pidfd_signal(pidfd, signal.SIGTERM)
+        deadline = time.monotonic() + TERM_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            if not same_generation_alive(identity):
+                clear_process_records(spec)
+                return
+            time.sleep(0.2)
+
+        print(f"[{PROJECT_NAME}] {spec.name} did not stop after SIGTERM; sending SIGKILL")
+        send_pidfd_signal(pidfd, signal.SIGKILL)
+        deadline = time.monotonic() + KILL_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            if not same_generation_alive(identity):
+                clear_process_records(spec)
+                return
+            time.sleep(0.1)
+        raise LauncherError(f"{spec.name} PID {identity.pid} did not stop")
+    finally:
+        os.close(pidfd)
+
+
+def terminate_failed_child(process: subprocess.Popen[bytes], pidfd: int) -> None:
+    if process.poll() is not None:
+        return
+    send_pidfd_signal(pidfd, signal.SIGTERM)
+    try:
+        process.wait(timeout=TERM_TIMEOUT_SECONDS)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    send_pidfd_signal(pidfd, signal.SIGKILL)
+    try:
+        process.wait(timeout=KILL_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise LauncherError(
+            f"failed child PID {process.pid} remained alive after SIGKILL"
+        ) from exc
+
+
+def start_component(spec: ProcessSpec, expected_uid: int) -> Tuple[ProcessIdentity, bool]:
+    existing = locate_process(spec, expected_uid)
+    if existing is not None:
+        if not health_ok(spec):
+            raise LauncherError(
+                f"{spec.name} PID {existing.pid} is running but its health check failed; use restart"
+            )
+        print(f"[{PROJECT_NAME}] {spec.name} already running (PID={existing.pid})")
+        return existing, False
+    if port_is_open(spec.port):
+        raise LauncherError(
+            f"port {spec.port} is already in use by an untracked process; nothing was changed"
+        )
+
+    log_fd = os.open(spec.log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    os.fchmod(log_fd, 0o600)
+    with os.fdopen(log_fd, "ab", buffering=0) as log_handle:
+        process = subprocess.Popen(
+            spec.argv,
+            cwd=PROJECT_ROOT,
+            env=process_environment(spec),
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            close_fds=True,
+        )
+    launch_pidfd = os.pidfd_open(process.pid, 0)
+
+    identity: Optional[ProcessIdentity] = None
+    deadline = time.monotonic() + START_TIMEOUT_SECONDS
+    last_error = "process identity was not available"
+    while time.monotonic() < deadline:
+        try:
+            identity = inspect_expected_process(spec, process.pid, expected_uid)
+            write_process_records(spec, identity)
+            if health_ok(spec):
+                print(f"[{PROJECT_NAME}] {spec.name} started (PID={identity.pid})")
+                os.close(launch_pidfd)
+                return identity, True
+        except (LauncherError, OSError, ProcessLookupError) as exc:
+            last_error = str(exc)
+        if process.poll() is not None:
+            last_error = f"process exited with status {process.returncode}"
+            break
+        time.sleep(0.2)
+
+    try:
+        terminate_failed_child(process, launch_pidfd)
+    finally:
+        os.close(launch_pidfd)
+        clear_process_records(spec)
+    raise LauncherError(f"{spec.name} failed to start: {last_error}; see {spec.log_file}")
+
+
+def stop_component(spec: ProcessSpec, expected_uid: int) -> Optional[ProcessIdentity]:
+    identity = locate_process(spec, expected_uid)
+    if identity is None:
+        print(f"[{PROJECT_NAME}] {spec.name} already stopped")
+        return None
+
+    terminate_identity(spec, identity, expected_uid)
+    print(f"[{PROJECT_NAME}] {spec.name} stopped (PID={identity.pid})")
+    return identity
+
+
+def start_all(expected_uid: int) -> Dict[str, Tuple[ProcessIdentity, bool]]:
+    started: Dict[str, Tuple[ProcessIdentity, bool]] = {}
+    newly_started: List[ProcessSpec] = []
+    try:
+        for spec in START_ORDER:
+            result = start_component(spec, expected_uid)
+            started[spec.name] = result
+            if result[1]:
+                newly_started.append(spec)
+    except Exception:
+        for spec in reversed(newly_started):
+            try:
+                stop_component(spec, expected_uid)
+            except LauncherError:
+                pass
+        raise
+    return started
+
+
+def stop_all(expected_uid: int) -> Dict[str, Optional[ProcessIdentity]]:
+    stopped: Dict[str, Optional[ProcessIdentity]] = {}
+    errors: List[str] = []
+    for spec in STOP_ORDER:
+        try:
+            stopped[spec.name] = stop_component(spec, expected_uid)
+        except LauncherError as exc:
+            errors.append(str(exc))
+    if errors:
+        raise LauncherError("; ".join(errors))
+    return stopped
+
+
+def status_all(expected_uid: int) -> int:
+    running = 0
+    for spec in START_ORDER:
+        identity = locate_process(spec, expected_uid)
+        if identity is None:
+            print(f"[{PROJECT_NAME}] {spec.name}: stopped (port={spec.port})")
+            continue
+        healthy = health_ok(spec)
+        state = "running" if healthy else "unhealthy"
+        print(f"[{PROJECT_NAME}] {spec.name}: {state} (PID={identity.pid}, port={spec.port})")
+        if healthy:
+            running += 1
+    overall = "running" if running == len(START_ORDER) else "stopped" if running == 0 else "degraded"
+    print(f"[{PROJECT_NAME}] service: {overall}")
+    print(f"[{PROJECT_NAME}] URL: {DASHBOARD_URL}")
+    return 0 if running == len(START_ORDER) else 3
+
+
+def tail_lines(path: Path, limit: int) -> Iterable[str]:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            position = handle.tell()
+            data = bytearray()
+            while position > 0 and data.count(b"\n") <= limit:
+                step = min(8192, position)
+                position -= step
+                handle.seek(position)
+                data[:0] = handle.read(step)
+    except FileNotFoundError:
+        return []
+    return data.decode("utf-8", errors="replace").splitlines()[-limit:]
+
+
+def show_logs() -> None:
+    for spec in START_ORDER:
+        print(f"===== {spec.name} (last {LOG_LINES} lines) =====")
+        lines = list(tail_lines(spec.log_file, LOG_LINES))
+        if lines:
+            for line in lines:
+                print(line)
+        else:
+            print(f"[no log file: {spec.log_file}]")
+
+
+def main(argv: List[str]) -> int:
+    if len(argv) != 2 or argv[1] not in ALLOWED_ACTIONS:
+        print(usage(), file=sys.stderr)
+        return 64
+    try:
+        expected_uid = validate_installation()
+        prepare_runtime()
+        lock_fd = acquire_lock()
+        try:
+            action = argv[1]
+            if action == "start":
+                start_all(expected_uid)
+                print(f"[{PROJECT_NAME}] service started")
+                print(f"[{PROJECT_NAME}] URL: {DASHBOARD_URL}")
+                return 0
+            if action == "stop":
+                stop_all(expected_uid)
+                print(f"[{PROJECT_NAME}] service stopped")
+                return 0
+            if action == "restart":
+                old = {spec.name: locate_process(spec, expected_uid) for spec in START_ORDER}
+                stop_all(expected_uid)
+                new = start_all(expected_uid)
+                for name, identity in old.items():
+                    if identity is not None and new[name][0].generation == identity.generation:
+                        raise LauncherError(f"{name} generation did not change during restart")
+                print(f"[{PROJECT_NAME}] service started")
+                print(f"[{PROJECT_NAME}] URL: {DASHBOARD_URL}")
+                return 0
+            if action == "status":
+                return status_all(expected_uid)
+            if action == "logs":
+                show_logs()
+                return 0
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+    except (LauncherError, OSError, ValueError) as exc:
+        print(f"[{PROJECT_NAME}] ERROR: {exc}", file=sys.stderr)
+        return 1
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
