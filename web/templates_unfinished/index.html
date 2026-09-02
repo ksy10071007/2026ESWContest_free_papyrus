@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Eye Healthcare Kiosk</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="/static/css/chat-widget.css">
+    <!-- i18n (Internationalization) System -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/chat-widget.js"></script>
+        <script defer src="/static/js/i18n-global.js"></script>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --primary-2: #5856D6;
+            --bg: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-dark: #0f172a;
+            --text-sub: #64748b;
+            --border: #e2e8f0;
+            --tag-bg: #f1f5f9;
+            --helper: #94a3b8;
+            --inset-shadow: rgba(0,0,0,0.02);
+            --btn-shadow: rgba(0, 122, 255, 0.3);
+            --btn-shadow-hover: rgba(0, 122, 255, 0.4);
+            --theme-btn-bg: #ffffff;
+            --theme-btn-text: #0f172a;
+            --theme-btn-border: #e2e8f0;
+            --theme-btn-shadow: rgba(15, 23, 42, 0.08);
+            --theme-btn-active: #f8fafc;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --primary-2: #7b79ff;
+            --bg: #0f1115;
+            --card-bg: #161a22;
+            --text-dark: #e5e7eb;
+            --text-sub: #aab3c2;
+            --border: #2a3240;
+            --tag-bg: #1a2230;
+            --helper: #8a94a8;
+            --inset-shadow: rgba(255,255,255,0.02);
+            --btn-shadow: rgba(78, 161, 255, 0.32);
+            --btn-shadow-hover: rgba(78, 161, 255, 0.45);
+            --theme-btn-bg: #1f2632;
+            --theme-btn-text: #e5e7eb;
+            --theme-btn-border: #334155;
+            --theme-btn-shadow: rgba(0, 0, 0, 0.35);
+            --theme-btn-active: #273244;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            /* 키오스크 규격 고정 */
+            width: 1280px;
+            height: 800px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .welcome-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: var(--card-bg);
+            box-shadow: inset 0 0 100px var(--inset-shadow);
+            position: relative;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 3000;
+            border: 1px solid var(--theme-btn-border);
+            background: var(--theme-btn-bg);
+            color: var(--theme-btn-text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px var(--theme-btn-shadow);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover {
+            transform: translateY(-1px);
+            background: var(--theme-btn-active);
+        }
+
+        .theme-toggle-floating:active {
+            transform: scale(0.98);
+        }
+
+        /* 메인 비주얼 아이콘 */
+        .main-visual {
+            margin-bottom: 30px;
+        }
+
+        .eye-scan-icon {
+            font-size: 7rem;
+            display: inline-block;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            color: var(--text-dark);
+            margin: 0 0 20px 0;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+        }
+
+        .subtitle {
+            font-size: 1.4rem;
+            color: var(--text-sub);
+            margin-bottom: 50px;
+            line-height: 1.6;
+        }
+
+        /* 질환 태그 */
+        .feature-tags {
+            margin-bottom: 60px;
+        }
+
+        .feature-tags span {
+            display: inline-block;
+            background: var(--tag-bg);
+            color: var(--primary);
+            padding: 10px 25px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 10px;
+            border: 1px solid var(--border);
+        }
+
+        /* 진단 시작하기 버튼 */
+        .btn-start {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: white;
+            padding: 25px 100px;
+            border-radius: 60px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-decoration: none;
+            box-shadow: 0 15px 35px var(--btn-shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .start-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .start-section .btn-start,
+        .start-section .btn-mobile-access,
+        .start-section .btn-kakao-link {
+            width: min(460px, 92vw);
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px var(--btn-shadow-hover);
+            filter: brightness(1.1);
+        }
+
+        .btn-start:active {
+            transform: scale(0.96);
+        }
+
+        .btn-mobile-access {
+            margin-top: 0;
+            display: inline-block;
+            background: #e2e8f0;
+            color: #1e293b;
+            padding: 14px 24px;
+            border-radius: 14px;
+            font-size: 1.02rem;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-kakao-link {
+            margin-top: 0;
+            display: inline-block;
+            background: #FEE500;
+            color: #191919;
+            padding: 14px 24px;
+            border-radius: 14px;
+            font-size: 1.02rem;
+            font-weight: 800;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(25, 25, 25, 0.12);
+        }
+
+        .btn-kakao-link:hover {
+            filter: brightness(0.98);
+            transform: translateY(-1px);
+        }
+
+        .mobile-o2o-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 2100;
+            background: rgba(15, 23, 42, 0.65);
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            box-sizing: border-box;
+        }
+
+        /* O2O 세션 타이머 */
+        .o2o-session-timer {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 12px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .o2o-session-timer.visible {
+            display: flex;
+        }
+
+        .o2o-session-timer.warning {
+            background: rgba(245, 158, 11, 0.95);
+            color: #78350f;
+        }
+
+        .o2o-session-timer.danger {
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+        }
+
+        .o2o-timer-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .o2o-timer-dot.warning {
+            animation: pulse 1s infinite ease-in-out;
+        }
+
+        .o2o-timer-dot.danger {
+            animation: pulse 0.5s infinite ease-in-out;
+        }
+
+        .kakao-link-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 2200;
+            background: rgba(15, 23, 42, 0.65);
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .kakao-link-panel {
+            width: min(520px, 100%);
+            background: var(--card-bg);
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+            overflow: hidden;
+        }
+
+        .kakao-link-header {
+            height: 56px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+
+        [data-theme="dark"] .kakao-link-header {
+            background: #111827;
+        }
+
+        .kakao-link-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .kakao-link-close {
+            border: none;
+            background: #e2e8f0;
+            color: #1e293b;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .kakao-link-body {
+            padding: 18px;
+            text-align: left;
+        }
+
+        .kakao-link-body p {
+            margin: 0 0 12px;
+            color: var(--text-sub);
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .kakao-phone-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            outline: none;
+            background: var(--card-bg);
+            color: var(--text-dark);
+        }
+
+        .kakao-link-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-kakao-cancel,
+        .btn-kakao-submit {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.93rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-kakao-cancel {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .btn-kakao-submit {
+            background: #FEE500;
+            color: #191919;
+        }
+
+        .kakao-link-status {
+            margin-top: 10px;
+            min-height: 20px;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+        }
+
+        .mobile-o2o-panel {
+            width: min(760px, 100%);
+            background: var(--card-bg);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+        }
+
+        .mobile-o2o-header {
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+            box-sizing: border-box;
+        }
+
+        [data-theme="dark"] .mobile-o2o-header {
+            background: #111827;
+        }
+
+        .mobile-o2o-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .mobile-o2o-close {
+            border: none;
+            background: #e2e8f0;
+            color: #1e293b;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .mobile-o2o-body {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .mobile-step-note {
+            margin: 0 0 14px;
+            color: var(--text-sub);
+            font-size: 0.96rem;
+            line-height: 1.45;
+        }
+
+        #mobile-qr-wrap {
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #mobile-server-url {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            word-break: break-all;
+        }
+
+        .mobile-pin-box {
+            margin-top: 18px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #f8fafc;
+            display: none;
+        }
+
+        [data-theme="dark"] .mobile-pin-box {
+            background: #111827;
+        }
+
+        #mobile-pin-number {
+            font-size: 2.4rem;
+            font-weight: 900;
+            letter-spacing: 8px;
+            color: var(--primary);
+            margin: 8px 0 0;
+        }
+
+        #mobile-connect-status,
+        #mobile-complete-status {
+            margin-top: 14px;
+            font-size: 0.95rem;
+            color: var(--text-sub);
+        }
+
+        .helper-text {
+            margin-top: 30px;
+            font-size: 1rem;
+            color: var(--helper);
+        }
+
+        /* ============================================
+           LANGUAGE SELECTOR FAB (Bottom-Right)
+           ============================================ */
+        .language-selector-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 90px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: row-reverse;
+            gap: 0;
+            align-items: center;
+        }
+
+        /* Current language flag - circular FAB button */
+        .language-fab-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 2px solid var(--primary);
+            cursor: pointer;
+            font-size: 1.8rem;
+            line-height: 1;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
+            z-index: 2001;
+        }
+
+        .language-fab-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0, 122, 255, 0.3);
+        }
+
+        .language-fab-toggle:active {
+            transform: scale(0.95);
+        }
+
+        [data-theme="dark"] .language-fab-toggle {
+            box-shadow: 0 4px 12px rgba(78, 161, 255, 0.25);
+        }
+
+        [data-theme="dark"] .language-fab-toggle:hover {
+            box-shadow: 0 6px 16px rgba(78, 161, 255, 0.35);
+        }
+
+        /* Language menu - expands to the left */
+        .language-fab-menu {
+            display: flex;
+            flex-direction: row-reverse;
+            gap: 8px;
+            background: var(--card-bg);
+            border: 2px solid var(--primary);
+            border-radius: 18px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.15);
+            max-width: 0;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            align-items: center;
+        }
+
+        .language-fab-menu.open {
+            max-width: 320px;
+        }
+
+        /* Language option buttons in FAB menu */
+        .language-fab-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 1.4rem;
+            line-height: 1;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            padding: 0;
+            margin: 0;
+        }
+
+        .language-fab-option:hover {
+            background: #f0f7ff;
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+
+        [data-theme="dark"] .language-fab-option:hover {
+            background: #0f2a4d;
+        }
+
+        .language-fab-option.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+
+        /* Mobile adjustments */
+        @media screen and (max-width: 768px) {
+            .language-selector-fab {
+                right: 20px;
+                bottom: 90px;
+            }
+
+            .language-fab-toggle {
+                width: 48px;
+                height: 48px;
+                font-size: 1.6rem;
+            }
+
+            .language-fab-option {
+                width: 36px;
+                height: 36px;
+                font-size: 1.2rem;
+            }
+
+            .language-fab-menu {
+                padding: 6px 10px;
+                gap: 6px;
+            }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
+                overflow-y: auto;
+                display: block;
+            }
+
+            .welcome-container {
+                min-height: 100dvh;
+                height: auto;
+                justify-content: flex-start;
+                padding: 88px 18px 28px;
+                box-sizing: border-box;
+            }
+
+            .theme-toggle-floating {
+                right: 12px;
+                bottom: 12px;
+                min-height: 48px;
+                padding: 12px 16px;
+                font-size: 0.95rem;
+            }
+
+            .main-visual {
+                margin-bottom: 18px;
+            }
+
+            .eye-scan-icon {
+                font-size: 4.2rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+                line-height: 1.3;
+                margin-bottom: 12px;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+                line-height: 1.5;
+                margin-bottom: 28px;
+            }
+
+            .feature-tags {
+                margin-bottom: 30px;
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .feature-tags span {
+                margin: 0;
+                padding: 10px 18px;
+                font-size: 0.95rem;
+                width: 100%;
+                max-width: 320px;
+                box-sizing: border-box;
+            }
+
+            .start-section {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 14px;
+            }
+
+            .btn-start {
+                width: 100%;
+                max-width: 340px;
+                min-height: 48px;
+                padding: 14px 20px;
+                box-sizing: border-box;
+                font-size: 1.2rem;
+                border-radius: 18px;
+                text-align: center;
+            }
+
+            .helper-text {
+                margin-top: 0;
+                font-size: 0.88rem;
+                line-height: 1.45;
+                padding: 0 6px;
+            }
+
+            .btn-mobile-access {
+                width: 100%;
+                max-width: 340px;
+                min-height: 48px;
+                padding: 12px 18px;
+                font-size: 1rem;
+            }
+
+            .btn-kakao-link {
+                width: 100%;
+                max-width: 340px;
+                min-height: 48px;
+                padding: 12px 18px;
+                font-size: 1rem;
+            }
+
+            .mobile-o2o-overlay {
+                padding: 12px;
+            }
+
+            .kakao-link-overlay {
+                padding: 12px;
+            }
+
+            .mobile-o2o-body {
+                padding: 14px;
+            }
+
+            #mobile-qr-wrap {
+                width: 190px;
+                height: 190px;
+            }
+
+            #mobile-pin-number {
+                font-size: 2rem;
+                letter-spacing: 6px;
+            }
+        }
+
+        /* 키오스크 화면 보호기 타이머 UI */
+        .screensaver-timer {
+            position: fixed;
+            left: 18px;
+            bottom: 18px;
+            z-index: 2999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .screensaver-timer.visible {
+            display: flex;
+        }
+
+        .timer-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--timer-color, #10b981) var(--timer-progress, 0%),
+                rgba(255, 255, 255, 0.1) var(--timer-progress, 0%)
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            transition: background 0.3s ease;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .timer-text {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--timer-color, #10b981);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            line-height: 1;
+        }
+
+        .timer-label {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        [data-theme="dark"] .timer-circle {
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .timer-label {
+            color: var(--helper);
+        }
+
+        /* 타이머 상태별 색상 */
+        .timer-circle.timer-safe {
+            --timer-color: #10b981; /* 초록색 - 안전함 */
+        }
+
+        .timer-circle.timer-warning {
+            --timer-color: #f59e0b; /* 노란색 - 경고 */
+        }
+
+        .timer-circle.timer-danger {
+            --timer-color: #ef4444; /* 빨간색 - 위험 */
+        }
+    </style>
+</head>
+<body>
+
+<div class="welcome-container">
+    <button id="global-theme-toggle" class="theme-toggle-floating" type="button" aria-label="Toggle theme">
+        <span data-role="icon" data-i18n="theme_icon_dark">🌙</span>
+        <span data-role="label" data-i18n="theme_dark_mode">Dark Mode</span>
+    </button>
+
+    <div class="main-visual">
+        <span class="eye-scan-icon">👁️</span>
+    </div>
+
+    <h1 data-i18n="main_title">Eye Health Diagnosis Service</h1>
+    <p class="subtitle">
+        <span data-i18n-html="true" data-i18n="subtitle_line1">Powered by <strong>NVIDIA Jetson AI</strong></span><br>
+        <span data-i18n="subtitle_line2">Check your eye condition quickly and accurately.</span>
+    </p>
+    
+    <div class="feature-tags">
+        <span data-i18n="tag_conjunctivitis">#Conjunctivitis</span>
+        <span data-i18n="tag_cataract">#Cataract</span>
+        <span data-i18n="tag_pterygium">#Pterygium</span>
+    </div>
+
+    <div class="start-section">
+        <a href="/kakao_login?phone=01012345678" class="btn-start" data-i18n="btn_start_diagnosis">
+            Start Diagnosis
+        </a>
+        <button type="button" class="btn-kakao-link" onclick="openKakaoLinkModal()" data-i18n="btn_kakao_link">💬 Link Kakao Account</button>
+        <button type="button" class="btn-mobile-access" onclick="openMobileAccessModal()" data-i18n="btn_mobile_access">📱 Access via Mobile Device</button>
+        <p class="helper-text" data-i18n="helper_disclaimer">※ This service is provided for medical support and screening purposes.</p>
+    </div>
+</div>
+
+<!-- Language Selector FAB (Bottom-Right Corner) -->
+<div class="language-selector-fab" id="language-selector-fab">
+    <div class="language-fab-menu" id="language-fab-menu">
+        <button type="button" class="language-fab-option" data-lang="ko" onclick="selectLanguageFromFab('ko')" title="한국어" aria-label="Korean">🇰🇷</button>
+        <button type="button" class="language-fab-option" data-lang="en" onclick="selectLanguageFromFab('en')" title="English" aria-label="English">🇺🇸</button>
+        <button type="button" class="language-fab-option" data-lang="zh" onclick="selectLanguageFromFab('zh')" title="中文" aria-label="Chinese">🇨🇳</button>
+        <button type="button" class="language-fab-option" data-lang="vi" onclick="selectLanguageFromFab('vi')" title="Tiếng Việt" aria-label="Vietnamese">🇻🇳</button>
+        <button type="button" class="language-fab-option" data-lang="ru" onclick="selectLanguageFromFab('ru')" title="Русский" aria-label="Russian">🇷🇺</button>
+        <button type="button" class="language-fab-option" data-lang="ja" onclick="selectLanguageFromFab('ja')" title="日本語" aria-label="Japanese">🇯🇵</button>
+    </div>
+    <button type="button" class="language-fab-toggle" id="language-fab-toggle" onclick="toggleLanguageFab()" title="Change Language" aria-label="Language Selector">
+        <span id="language-fab-flag">🇰🇷</span>
+    </button>
+</div>
+
+<div id="mobile-o2o-overlay" class="mobile-o2o-overlay" onclick="closeMobileAccessModal(event)">
+    <div class="mobile-o2o-panel">
+        <div class="mobile-o2o-header">
+            <div class="mobile-o2o-title" data-i18n="mobile_o2o_title">Mobile Access (O2O)</div>
+            <div class="o2o-session-timer" id="o2o-session-timer">
+                <span class="o2o-timer-dot"></span>
+                <span id="o2o-timer-text">3:00</span>
+            </div>
+            <button class="mobile-o2o-close" type="button" onclick="closeMobileAccessModal()" data-i18n="mobile_o2o_close">Close</button>
+        </div>
+        <div class="mobile-o2o-body">
+            <p class="mobile-step-note" data-i18n="mobile_o2o_step1">Step 1: Scan the QR code below on your smartphone.</p>
+            <div id="mobile-qr-wrap"><span style="font-size:0.88rem; color:#94a3b8;" data-i18n="mobile_qr_preparing">QR Preparing...</span></div>
+            <div id="mobile-server-url"></div>
+
+            <div id="mobile-connect-status" data-i18n="mobile_o2o_waiting">Waiting for mobile access...</div>
+
+            <div id="mobile-pin-box" class="mobile-pin-box">
+                <div style="font-size:0.92rem; color:var(--text-sub);" data-i18n="mobile_o2o_step2">Step 2: Enter the PIN displayed on your smartphone</div>
+                <div id="mobile-pin-number">----</div>
+            </div>
+
+            <div id="mobile-complete-status"></div>
+        </div>
+    </div>
+</div>
+
+<div id="kakao-link-overlay" class="kakao-link-overlay" onclick="closeKakaoLinkModal(event)">
+    <div class="kakao-link-panel">
+        <div class="kakao-link-header">
+            <div class="kakao-link-title" data-i18n="kakao_link_title">Link Kakao Account</div>
+            <button class="kakao-link-close" type="button" onclick="closeKakaoLinkModal()" data-i18n="kakao_link_close">Close</button>
+        </div>
+        <div class="kakao-link-body">
+            <p data-i18n="kakao_link_description">Enter your phone number and consent to Kakao login to link your account with this device.</p>
+            <input id="kakao-phone-input" class="kakao-phone-input" type="tel" inputmode="numeric" maxlength="13" data-i18n="kakao_link_placeholder" data-i18n-placeholder="true" placeholder="010-1234-5678" />
+            <div class="kakao-link-actions">
+                <button type="button" class="btn-kakao-cancel" onclick="closeKakaoLinkModal()" data-i18n="kakao_link_cancel">Cancel</button>
+                <button type="button" class="btn-kakao-submit" onclick="submitKakaoLink()" data-i18n="kakao_link_submit">Open Login Popup</button>
+            </div>
+            <div id="kakao-link-status" class="kakao-link-status"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const root = document.documentElement;
+        const btn = document.getElementById('global-theme-toggle');
+        const icon = btn.querySelector('[data-role="icon"]');
+        const label = btn.querySelector('[data-role="label"]');
+
+        function getTheme() {
+            const now = root.getAttribute('data-theme');
+            return (now === 'dark' || now === 'light') ? now : 'light';
+        }
+
+        function themeModeText(mode) {
+            let lang = 'ko';
+            try {
+                const saved = localStorage.getItem('i18n_language') || localStorage.getItem('selectedLanguage') || document.documentElement.lang || 'ko';
+                lang = String(saved).slice(0, 2).toLowerCase();
+            } catch (e) {}
+            const map = {
+                ko: { dark: '다크 모드', light: '라이트 모드' },
+                en: { dark: 'Dark Mode', light: 'Light Mode' },
+                zh: { dark: '暗黑模式', light: '浅色模式' },
+                vi: { dark: 'Chế độ Tối', light: 'Chế độ Sáng' },
+                ru: { dark: 'Темный режим', light: 'Светлый режим' },
+                ja: { dark: 'ダークモード', light: 'ライトモード' }
+            };
+            const selected = map[lang] || map.ko;
+            return selected[mode] || map.ko[mode];
+        }
+
+        function applyTheme(theme) {
+            root.setAttribute('data-theme', theme);
+            try {
+                localStorage.setItem('theme', theme);
+            } catch (e) {
+                // ignore storage errors
+            }
+
+            if (theme === 'dark') {
+                icon.textContent = '☀️';
+                label.textContent = themeModeText('light');
+            } else {
+                icon.textContent = '🌙';
+                label.textContent = themeModeText('dark');
+            }
+        }
+
+        applyTheme(getTheme());
+
+        btn.addEventListener('click', function () {
+            const next = getTheme() === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+        });
+
+        // Update theme toggle label on language change
+        i18n.onLanguageChange(() => {
+            const theme = getTheme();
+            if (theme === 'dark') {
+                icon.textContent = i18n.getTranslation('theme_icon_light');
+                label.textContent = i18n.getTranslation('theme_light_mode');
+            } else {
+                icon.textContent = i18n.getTranslation('theme_icon_dark');
+                label.textContent = i18n.getTranslation('theme_dark_mode');
+            }
+        });
+
+        // Update language selector button styles on language change
+        i18n.onLanguageChange((lang) => {
+            document.querySelectorAll('.language-btn').forEach(btn => {
+                btn.classList.remove('lang-active');
+            });
+            const activeBtn = document.getElementById(`lang-${lang}`);
+            if (activeBtn) {
+                activeBtn.classList.add('lang-active');
+            }
+        });
+    })();
+</script>
+
+<script>
+    /**
+     * Language metadata for dropdown and FAB display
+     */
+    const languageMetadata = {
+        'ko': { flag: '🇰🇷', name: '한국어' },
+        'en': { flag: '🇺🇸', name: 'English' },
+        'zh': { flag: '🇨🇳', name: '中文' },
+        'vi': { flag: '🇻🇳', name: 'Tiếng Việt' },
+        'ru': { flag: '🇷🇺', name: 'Русский' },
+        'ja': { flag: '🇯🇵', name: '日本語' }
+    };
+
+    /**
+     * Initialize language selector on page load with persistent language
+     */
+    window.addEventListener('load', function() {
+        setTimeout(() => {
+            initializeLanguageSelector();
+        }, 100);
+    });
+
+    /**
+     * Initialize language selector with current language from i18n
+     */
+    function initializeLanguageSelector() {
+        if (typeof i18n === 'undefined') {
+            console.warn('[Language Selector] i18n object not ready');
+            return;
+        }
+
+        const currentLang = i18n.getCurrentLanguage();
+        console.log(`[Language Selector] Initializing with language: ${currentLang}`);
+        updateLanguageSelectorUI(currentLang);
+    }
+
+    /**
+     * Update language selector UI to show current language
+     */
+    function updateLanguageSelectorUI(langCode) {
+        const metadata = languageMetadata[langCode];
+        if (!metadata) {
+            console.warn(`[Language Selector] Unknown language: ${langCode}`);
+            return;
+        }
+
+        // Update FAB flag
+        const fabFlag = document.getElementById('language-fab-flag');
+        if (fabFlag) fabFlag.textContent = metadata.flag;
+
+        // Update FAB menu - mark selected language
+        document.querySelectorAll('.language-fab-option').forEach(btn => {
+            if (btn.getAttribute('data-lang') === langCode) {
+                btn.classList.add('selected');
+            } else {
+                btn.classList.remove('selected');
+            }
+        });
+
+        // Also update old dropdown UI if it exists
+        const nameEl = document.getElementById('language-current-name');
+        if (nameEl) {
+            nameEl.textContent = metadata.name;
+        }
+        
+        const flagEl = document.getElementById('language-current-flag');
+        if (flagEl) flagEl.textContent = metadata.flag;
+
+        // Update selected state in dropdown options if they exist
+        document.querySelectorAll('.language-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+        const selectedOption = document.querySelector(`.language-option[data-lang="${langCode}"]`);
+        if (selectedOption) {
+            selectedOption.classList.add('selected');
+        }
+    }
+
+    /**
+     * Toggle language FAB menu expansion
+     */
+    function toggleLanguageFab() {
+        const menu = document.getElementById('language-fab-menu');
+        if (menu) {
+            menu.classList.toggle('open');
+            console.log('[Language FAB] Menu toggled');
+        }
+    }
+
+    /**
+     * Close language FAB menu
+     */
+    function closeLanguageFab() {
+        const menu = document.getElementById('language-fab-menu');
+        if (menu) {
+            menu.classList.remove('open');
+        }
+    }
+
+    /**
+     * Select language from FAB and update
+     */
+    function selectLanguageFromFab(langCode) {
+        if (!['ko', 'en', 'zh', 'vi', 'ru', 'ja'].includes(langCode)) {
+            console.warn(`[Language FAB] Invalid language code: ${langCode}`);
+            return;
+        }
+
+        console.log(`[Language FAB] Selected language: ${langCode}`);
+        
+        // Update UI
+        updateLanguageSelectorUI(langCode);
+
+        // Call i18n language change function
+        if (typeof i18n !== 'undefined' && i18n.changeLanguage) {
+            i18n.changeLanguage(langCode);
+        } else {
+            console.warn('[Language FAB] i18n object not ready');
+        }
+
+        // Close FAB menu
+        closeLanguageFab();
+    }
+
+    /**
+     * Toggle language dropdown menu (old UI for compatibility)
+     */
+    function toggleLanguageDropdown() {
+        const dropdown = document.getElementById('language-dropdown-menu');
+        const toggleBtn = document.getElementById('language-toggle-btn');
+
+        if (!dropdown || !toggleBtn) return;
+
+        if (dropdown.classList.contains('open')) {
+            dropdown.classList.remove('open');
+            toggleBtn.classList.remove('expanded');
+        } else {
+            dropdown.classList.add('open');
+            toggleBtn.classList.add('expanded');
+        }
+    }
+
+    /**
+     * Close language dropdown menu
+     */
+    function closeLanguageDropdown() {
+        const dropdown = document.getElementById('language-dropdown-menu');
+        const toggleBtn = document.getElementById('language-toggle-btn');
+        if (dropdown) dropdown.classList.remove('open');
+        if (toggleBtn) toggleBtn.classList.remove('expanded');
+    }
+
+    /**
+     * Select language and close dropdown
+     */
+    function selectLanguageAndClose(langCode) {
+        // Validate language code
+        if (!['ko', 'en', 'zh', 'vi', 'ru', 'ja'].includes(langCode)) {
+            console.warn(`[Language Selector] Invalid language code: ${langCode}`);
+            return;
+        }
+
+        // Update UI
+        updateLanguageSelectorUI(langCode);
+
+        // Call the i18n language change function
+        if (typeof i18n !== 'undefined' && i18n.changeLanguage) {
+            console.log(`[Language Selector] Changing language to: ${langCode}`);
+            i18n.changeLanguage(langCode);
+        } else {
+            console.warn('[Language Selector] i18n object not ready');
+        }
+
+        // Close dropdown with animation
+        closeLanguageDropdown();
+    }
+
+    /**
+     * Close dropdown when clicking outside
+     */
+    document.addEventListener('click', function(event) {
+        // Close FAB menu if clicking outside
+        const fab = document.getElementById('language-selector-fab');
+        if (fab && !fab.contains(event.target)) {
+            closeLanguageFab();
+        }
+
+        // Close dropdown if clicking outside
+        const languageContainer = document.querySelector('.language-selector-container');
+        if (languageContainer && !languageContainer.contains(event.target)) {
+            closeLanguageDropdown();
+        }
+    });
+
+    /**
+     * Legacy function - kept for compatibility
+     */
+    function changeLanguageAndUpdateUI(langCode) {
+        selectLanguageAndClose(langCode);
+    }
+
+    /**
+     * 세션 초기화 마스터 로직
+     * 새 사용자가 '진단 시작하기'(btn-start) 버튼을 누를 때 이전 사용자의 데이터를 완전히 비우기
+     */
+    function clearSessionForNewUser(event) {
+        console.log('[Session Master] Clearing session for new user...');
+        
+        try {
+            // 1. sessionStorage 전체 삭제 - 세션 동안 저장된 모든 데이터 초기화
+            sessionStorage.clear();
+            console.log('[Session Master] sessionStorage cleared');
+        } catch (e) {
+            console.error('[Session Master] Error clearing sessionStorage:', e);
+        }
+
+        try {
+            // 2. localStorage에서 안구 캡처 캐시 삭제 - 이전 사용자의 캡처 이미지 데이터 제거
+            localStorage.removeItem('last_mobile_upload_capture');
+            console.log('[Session Master] last_mobile_upload_capture removed from localStorage');
+        } catch (e) {
+            console.error('[Session Master] Error removing last_mobile_upload_capture:', e);
+        }
+
+        console.log('[Session Master] Session initialization completed. Proceeding to login...');
+        
+        // 3. 세션 초기화 완료 후 로그인 페이지로 이동
+        // href 속성으로 자동 네비게이션 (anchor 태그의 기본 동작)
+        // event.preventDefault()를 호출하지 않아서 링크가 정상 동작
+    }
+
+    let kakaoPopupRef = null;
+
+    function openCenteredPopup(url, name, width, height) {
+        const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX;
+        const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || screen.width;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || screen.height;
+
+        const left = Math.max(0, Math.floor(dualScreenLeft + (viewportWidth - width) / 2));
+        const top = Math.max(0, Math.floor(dualScreenTop + (viewportHeight - height) / 2));
+
+        const features = [
+            `width=${width}`,
+            `height=${height}`,
+            `left=${left}`,
+            `top=${top}`,
+            'menubar=no',
+            'toolbar=no',
+            'location=no',
+            'status=no',
+            'resizable=yes',
+            'scrollbars=yes'
+        ].join(',');
+
+        const popup = window.open(url, name, features);
+        if (popup && popup.focus) {
+            popup.focus();
+        }
+        return popup;
+    }
+
+    function normalizeKakaoPhone(raw) {
+        const digits = String(raw || '').replace(/\D/g, '').slice(0, 11);
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+        return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+    }
+
+    function readSessionValue(key) {
+        const current = sessionStorage.getItem(key);
+        if (current !== null) return current;
+
+        const legacy = localStorage.getItem(key);
+        if (legacy !== null) {
+            sessionStorage.setItem(key, legacy);
+            localStorage.removeItem(key);
+        }
+        return legacy;
+    }
+
+    function openKakaoLinkModal() {
+        const overlay = document.getElementById('kakao-link-overlay');
+        const input = document.getElementById('kakao-phone-input');
+        const status = document.getElementById('kakao-link-status');
+        const saved = (readSessionValue('user_id') || '').trim();
+
+        status.textContent = '';
+        input.value = normalizeKakaoPhone(saved);
+        overlay.style.display = 'flex';
+
+        setTimeout(() => input.focus(), 50);
+
+        // Reapply translations for modal
+        setTimeout(() => i18n.applyTranslations(), 50);
+    }
+
+    function closeKakaoLinkModal(event) {
+        if (event && event.target && event.target.id !== 'kakao-link-overlay') {
+            return;
+        }
+        const overlay = document.getElementById('kakao-link-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    function submitKakaoLink() {
+        const input = document.getElementById('kakao-phone-input');
+        const status = document.getElementById('kakao-link-status');
+        const normalized = normalizeKakaoPhone(input.value);
+        const digits = normalized.replace(/\D/g, '');
+
+        input.value = normalized;
+
+        if (digits.length !== 11) {
+            status.textContent = i18n.getTranslation('kakao_link_error_format');
+            return;
+        }
+
+        sessionStorage.setItem('user_id', normalized);
+        localStorage.removeItem('user_id');
+        status.textContent = i18n.getTranslation('kakao_link_loading');
+
+        const baseUrl = `${window.location.protocol}//${window.location.hostname}:5001`;
+        const loginUrl = `${baseUrl}/kakao/login?phone=${encodeURIComponent(normalized)}&popup=1`;
+
+        kakaoPopupRef = openCenteredPopup(loginUrl, 'kakao-link-popup', 560, 820);
+
+        if (!kakaoPopupRef) {
+            status.textContent = i18n.getTranslation('kakao_link_popup_blocked');
+            return;
+        }
+
+        status.textContent = i18n.getTranslation('kakao_link_status_wait');
+    }
+
+    window.addEventListener('message', function (event) {
+        const data = event && event.data ? event.data : null;
+        if (!data || data.type !== 'kakao-link-result') return;
+
+        const status = document.getElementById('kakao-link-status');
+        if (!status) return;
+
+        if (data.ok) {
+            status.textContent = i18n.getTranslation('kakao_link_success', { phone: data.phone || '' });
+            setTimeout(() => {
+                closeKakaoLinkModal();
+            }, 800);
+        } else {
+            status.textContent = data.message || i18n.getTranslation('kakao_link_error');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const input = document.getElementById('kakao-phone-input');
+        if (!input) return;
+        input.addEventListener('input', function () {
+            this.value = normalizeKakaoPhone(this.value);
+        });
+    });
+
+    let mobileAccessState = {
+        requestId: null,
+        pollTimer: null,
+        countdownTimer: null,
+        countdown: 0,
+        completed: false,
+        sessionTimer: null,
+        sessionCheckInterval: null,
+        sessionCountdown: 3 * 60 * 1000, // 3분 (ms)
+        sessionStartTime: null
+    };
+
+    function resetMobileAccessState() {
+        if (mobileAccessState.pollTimer) {
+            clearInterval(mobileAccessState.pollTimer);
+        }
+        if (mobileAccessState.countdownTimer) {
+            clearInterval(mobileAccessState.countdownTimer);
+        }
+        if (mobileAccessState.sessionTimer) {
+            clearTimeout(mobileAccessState.sessionTimer);
+        }
+        if (mobileAccessState.sessionCheckInterval) {
+            clearInterval(mobileAccessState.sessionCheckInterval);
+        }
+        
+        // O2O 세션 타이머 UI 숨김
+        const timerEl = document.getElementById('o2o-session-timer');
+        if (timerEl) {
+            timerEl.classList.remove('visible', 'warning', 'danger');
+        }
+        
+        mobileAccessState = {
+            requestId: null,
+            pollTimer: null,
+            countdownTimer: null,
+            countdown: 0,
+            completed: false,
+            sessionTimer: null,
+            sessionCheckInterval: null,
+            sessionCountdown: 3 * 60 * 1000,
+            sessionStartTime: null
+        };
+    }
+
+    function closeMobileAccessModal(event) {
+        if (event && event.target && event.target.id !== 'mobile-o2o-overlay') {
+            return;
+        }
+        const overlay = document.getElementById('mobile-o2o-overlay');
+        if (overlay) overlay.style.display = 'none';
+        resetMobileAccessState();
+    }
+
+    /**
+     * O2O 세션 타이머 UI 업데이트
+     */
+    function updateO2OSessionTimer() {
+        const timerEl = document.getElementById('o2o-session-timer');
+        const timerTextEl = document.getElementById('o2o-timer-text');
+        const dotEl = timerEl?.querySelector('.o2o-timer-dot');
+
+        if (!timerEl || !timerTextEl || !dotEl) return;
+
+        // 현재 경과 시간 계산
+        const elapsed = Date.now() - mobileAccessState.sessionStartTime;
+        const remaining = Math.max(0, mobileAccessState.sessionCountdown - elapsed);
+        const secondsLeft = Math.ceil(remaining / 1000);
+
+        // 분:초 형식으로 표시
+        const minutes = Math.floor(secondsLeft / 60);
+        const seconds = secondsLeft % 60;
+        timerTextEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // 상태 변경 (색상 + 애니메이션)
+        timerEl.classList.remove('warning', 'danger');
+        dotEl.classList.remove('warning', 'danger');
+
+        if (secondsLeft > 60) {
+            // 정상 상태 (기본 파란색)
+        } else if (secondsLeft > 30) {
+            // 경고 상태 (노란색)
+            timerEl.classList.add('warning');
+            dotEl.classList.add('warning');
+        } else {
+            // 위험 상태 (빨간색)
+            timerEl.classList.add('danger');
+            dotEl.classList.add('danger');
+        }
+
+        console.log(`[O2O Session] Timer: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+    }
+
+    /**
+     * O2O 세션 타이머 시작
+     */
+    function startO2OSessionTimer() {
+        const timerEl = document.getElementById('o2o-session-timer');
+        if (!timerEl) return;
+
+        // 타이머 시작
+        mobileAccessState.sessionStartTime = Date.now();
+        timerEl.classList.add('visible');
+
+        console.log('[O2O Session] Timer started (3 minutes)');
+
+        // 초기 UI 업데이트
+        updateO2OSessionTimer();
+
+        // 매 초마다 UI 업데이트
+        if (mobileAccessState.sessionCheckInterval) {
+            clearInterval(mobileAccessState.sessionCheckInterval);
+        }
+        mobileAccessState.sessionCheckInterval = setInterval(updateO2OSessionTimer, 1000);
+
+        // 세션 타임아웃 설정 (3분 후 자동 폐기)
+        if (mobileAccessState.sessionTimer) {
+            clearTimeout(mobileAccessState.sessionTimer);
+        }
+        mobileAccessState.sessionTimer = setTimeout(() => {
+            console.log('[O2O Session] Session timeout reached. Closing QR modal...');
+            closeMobileAccessModal();
+            alert(i18n.getTranslation('mobile_o2o_session_expired'));
+        }, mobileAccessState.sessionCountdown);
+    }
+
+    function renderMobileQr(url) {
+        const qrWrap = document.getElementById('mobile-qr-wrap');
+        qrWrap.innerHTML = '';
+        new QRCode(qrWrap, {
+            text: url,
+            width: 180,
+            height: 180,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+
+    async function openMobileAccessModal() {
+        const overlay = document.getElementById('mobile-o2o-overlay');
+        const statusEl = document.getElementById('mobile-connect-status');
+        const completeEl = document.getElementById('mobile-complete-status');
+        const pinBox = document.getElementById('mobile-pin-box');
+        const pinNumber = document.getElementById('mobile-pin-number');
+        const urlEl = document.getElementById('mobile-server-url');
+
+        resetMobileAccessState();
+        completeEl.textContent = '';
+        statusEl.textContent = i18n.getTranslation('mobile_o2o_waiting');
+        pinBox.style.display = 'none';
+        pinNumber.textContent = '----';
+        overlay.style.display = 'flex';
+
+        // O2O 세션 타임아웃 타이머 시작
+        startO2OSessionTimer();
+
+        try {
+            const res = await fetch('/api/generate_pin', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || 'PIN 발급 실패');
+            }
+
+            mobileAccessState.requestId = data.request_id;
+            renderMobileQr(data.mobile_url);
+            urlEl.textContent = data.mobile_url;
+
+            mobileAccessState.pollTimer = setInterval(async () => {
+                if (!mobileAccessState.requestId || mobileAccessState.completed) return;
+
+                try {
+                    const statusRes = await fetch(`/api/pin_status?request_id=${encodeURIComponent(mobileAccessState.requestId)}`);
+                    const statusData = await statusRes.json();
+                    if (!statusRes.ok || statusData.status !== 'ok') {
+                        return;
+                    }
+
+                    if (statusData.mobile_connected) {
+                        statusEl.textContent = i18n.getTranslation('mobile_o2o_connected');
+                        pinBox.style.display = 'block';
+                        pinNumber.textContent = statusData.pin || '----';
+                    }
+
+                    if (statusData.verified) {
+                        mobileAccessState.completed = true;
+                        statusEl.textContent = i18n.getTranslation('mobile_o2o_verified');
+                        mobileAccessState.countdown = 5;
+                        completeEl.textContent = i18n.getTranslation('mobile_o2o_redirect', { count: mobileAccessState.countdown });
+
+                        if (mobileAccessState.pollTimer) {
+                            clearInterval(mobileAccessState.pollTimer);
+                            mobileAccessState.pollTimer = null;
+                        }
+
+                        mobileAccessState.countdownTimer = setInterval(() => {
+                            mobileAccessState.countdown -= 1;
+                            if (mobileAccessState.countdown <= 0) {
+                                clearInterval(mobileAccessState.countdownTimer);
+                                closeMobileAccessModal();
+                                window.location.href = '/';
+                                return;
+                            }
+                            completeEl.textContent = i18n.getTranslation('mobile_o2o_redirect', { count: mobileAccessState.countdown });
+                        }, 1000);
+                    }
+                } catch (e) {
+                    // polling error ignore
+                }
+            }, 1000);
+        } catch (error) {
+            statusEl.textContent = `오류: ${error.message || error}`;
+        }
+    }
+</script>
+
+<script>
+    /**
+     * 키오스크 화면 보호기 모드 - 타임아웃 스크립트 (시각적 타이머 포함)
+     * 특정시간 동안 입력이 없으면 터치 유도 애니메이션 화면(메인 화면)으로 자동 복귀
+     */
+    (function () {
+        // 설정값
+        const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5분 (인프로덕션에서 필요시 조정)
+        
+        let inactivityTimer = null;
+        let displayUpdateTimer = null;
+        let isHomeScreen = false;
+        let remainingTime = INACTIVITY_TIMEOUT; // 남은 시간 (ms)
+
+        /**
+         * 타이머 UI 업데이트 함수
+         */
+        function updateTimerDisplay() {
+            const timerEl = document.getElementById('screensaver-timer');
+            const circleEl = document.getElementById('screensaver-timer-circle');
+            const textEl = document.getElementById('screensaver-timer-text');
+
+            if (!timerEl || !circleEl || !textEl) return;
+
+            // 남은 시간을 초 단위로 변환
+            const totalSeconds = INACTIVITY_TIMEOUT / 1000;
+            const secondsLeft = Math.max(0, Math.ceil(remainingTime / 1000));
+            
+            // 분:초 형식으로 표시
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            textEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            // 진행률 계산 (0~100%)
+            const progress = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
+            circleEl.style.setProperty('--timer-progress', `${progress}%`);
+
+            // 남은 시간 비율에 따라 색상 변경
+            circleEl.classList.remove('timer-safe', 'timer-warning', 'timer-danger');
+            
+            if (secondsLeft > 180) {
+                // 3분 이상: 안전 (초록색)
+                circleEl.classList.add('timer-safe');
+            } else if (secondsLeft > 60) {
+                // 1~3분: 경고 (노란색)
+                circleEl.classList.add('timer-warning');
+            } else {
+                // 1분 이하: 위험 (빨간색)
+                circleEl.classList.add('timer-danger');
+            }
+
+            console.log(`[Screensaver] Timer display updated: ${minutes}:${seconds.toString().padStart(2, '0')} (${progress.toFixed(0)}%)`);
+        }
+
+        /**
+         * 타이머 표시 시작
+         */
+        function startTimerDisplay() {
+            const timerEl = document.getElementById('screensaver-timer');
+            if (!timerEl) return;
+
+            // 타이머 UI 표시
+            timerEl.classList.add('visible');
+
+            // 매1초마다 UI 업데이트
+            if (displayUpdateTimer !== null) {
+                clearInterval(displayUpdateTimer);
+            }
+
+            displayUpdateTimer = setInterval(function () {
+                remainingTime -= 1000;
+                if (remainingTime < 0) remainingTime = 0;
+                updateTimerDisplay();
+            }, 1000);
+
+            // 초기 표시 업데이트
+            updateTimerDisplay();
+
+            console.log('[Screensaver] Timer display started');
+        }
+
+        /**
+         * 타이머 표시 종료
+         */
+        function stopTimerDisplay() {
+            const timerEl = document.getElementById('screensaver-timer');
+            if (!timerEl) return;
+
+            // 타이머 UI 숨김
+            timerEl.classList.remove('visible');
+
+            // 업데이트 인터벌 취소
+            if (displayUpdateTimer !== null) {
+                clearInterval(displayUpdateTimer);
+                displayUpdateTimer = null;
+            }
+
+            console.log('[Screensaver] Timer display stopped');
+        }
+
+        /**
+         * 사용자 활동 감지 시 타이머 리셋
+         */
+        function resetInactivityTimer() {
+            // 현재 화면이 홈 화면이 아닐 때만 타이머 동작
+            if (isHomeScreen) {
+                stopTimerDisplay();
+                return;
+            }
+
+            // 기존 타이머 취소
+            if (inactivityTimer !== null) {
+                clearTimeout(inactivityTimer);
+            }
+
+            // 남은 시간 초기화
+            remainingTime = INACTIVITY_TIMEOUT;
+
+            console.log('[Screensaver] Inactivity timer reset');
+
+            // 타이머 디스플레이 시작
+            startTimerDisplay();
+
+            // 새 타이머 설정
+            inactivityTimer = setTimeout(function () {
+                console.log('[Screensaver] Inactivity timeout reached. Returning to home screen...');
+                stopTimerDisplay();
+                window.location.href = '/';
+            }, INACTIVITY_TIMEOUT);
+        }
+
+        /**
+         * 페이지 로드 완료 후 초기화
+         */
+        window.addEventListener('load', function () {
+            // 홈 화면 여부 판단 (현재 경로가 / 또는 /index.html)
+            const currentPath = window.location.pathname;
+            isHomeScreen = currentPath === '/' || currentPath.endsWith('index.html');
+            
+            console.log('[Screensaver] Initialized. Current screen:', isHomeScreen ? 'Home' : 'Other');
+            
+            // 홈 화면이 아닐 때만 타이머 시작
+            if (!isHomeScreen) {
+                resetInactivityTimer();
+            }
+        });
+
+        /**
+         * 사용자 입력 감지 리스너
+         */
+        document.addEventListener('click', resetInactivityTimer);
+        document.addEventListener('keydown', resetInactivityTimer);
+        document.addEventListener('touchstart', resetInactivityTimer);
+        document.addEventListener('mousemove', resetInactivityTimer);
+
+        /**
+         * 페이지 포커스 복귀 시 타이머 리셋
+         */
+        window.addEventListener('focus', resetInactivityTimer);
+
+        /**
+         * 페이지 언로드 시 타이머 정리
+         */
+        window.addEventListener('beforeunload', function () {
+            if (inactivityTimer !== null) {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = null;
+            }
+            stopTimerDisplay();
+        });
+    })();
+</script>
+
+<!-- Screensaver Timer UI -->
+<div class="screensaver-timer" id="screensaver-timer">
+    <div class="timer-circle timer-safe" id="screensaver-timer-circle">
+        <div class="timer-text" id="screensaver-timer-text">5:00</div>
+    </div>
+    <div class="timer-label" data-i18n="screensaver_timeout">돌아가는 중...</div>
+</div>
+
+<script src="{{ url_for('static', filename='js/timeout.js') }}"></script>
+
+</body>
+</html>

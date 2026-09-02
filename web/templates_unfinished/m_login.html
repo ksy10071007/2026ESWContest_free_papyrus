@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모바일 PIN 인증</title>
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --text: #0f172a;
+            --sub: #64748b;
+            --border: #dbe2ea;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            color: var(--text);
+        }
+
+        .card {
+            width: 100%;
+            max-width: 430px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 22px 18px;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 1.38rem;
+            color: var(--primary);
+        }
+
+        .desc {
+            margin: 0 0 18px;
+            color: var(--sub);
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+
+        .pin-input {
+            width: 100%;
+            min-height: 56px;
+            border-radius: 14px;
+            border: 2px solid var(--border);
+            font-size: 2rem;
+            letter-spacing: 10px;
+            text-align: center;
+            font-weight: 800;
+            outline: none;
+            padding: 0 12px;
+        }
+
+        .pin-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            margin-top: 14px;
+            width: 100%;
+            min-height: 52px;
+            border: none;
+            border-radius: 14px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .msg {
+            margin-top: 12px;
+            min-height: 22px;
+            font-size: 0.92rem;
+            color: var(--sub);
+        }
+
+        .warn {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+<div class="card" id="mobile-login-card" data-request-id="{{ request_id|e }}">
+    <h1 data-i18n="m_login_title">📱 모바일 PIN 인증</h1>
+    <p class="desc">키오스크 화면에 표시된 4자리 PIN을 입력해 주세요.</p>
+
+    <input id="pin-input" class="pin-input" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="one-time-code">
+    <button id="verify-btn" class="btn" type="button" onclick="verifyPin()">인증 확인</button>
+    <div id="msg" class="msg"></div>
+</div>
+
+<script>
+    const requestId = document.getElementById('mobile-login-card')?.dataset?.requestId || '';
+
+    function setMessage(text, isError = false) {
+        const msgEl = document.getElementById('msg');
+        msgEl.textContent = text || '';
+        msgEl.className = isError ? 'msg warn' : 'msg';
+    }
+
+    async function notifyMobileConnected() {
+        if (!requestId) {
+            setMessage('잘못된 접근입니다. 키오스크에서 QR을 다시 열어주세요.', true);
+            document.getElementById('verify-btn').disabled = true;
+            return;
+        }
+
+        try {
+            await fetch('/api/mobile_connected', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: requestId })
+            });
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    async function verifyPin() {
+        const btn = document.getElementById('verify-btn');
+        const input = document.getElementById('pin-input');
+        const pin = (input.value || '').replace(/\D/g, '').slice(0, 4);
+
+        if (!requestId) {
+            setMessage('요청 정보가 없습니다. 키오스크에서 QR을 다시 생성해 주세요.', true);
+            return;
+        }
+
+        if (pin.length !== 4) {
+            setMessage('4자리 PIN을 입력해 주세요.', true);
+            return;
+        }
+
+        btn.disabled = true;
+        setMessage('인증 확인 중...');
+
+        try {
+            const res = await fetch('/api/verify_pin', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: requestId, pin })
+            });
+            const data = await res.json();
+
+            if (!res.ok || data.status !== 'ok') {
+                setMessage(data.message || 'PIN 인증에 실패했습니다.', true);
+                btn.disabled = false;
+                return;
+            }
+
+            setMessage('인증 성공! 화면을 이동합니다.');
+            setTimeout(() => {
+                const nextUrl = data.redirect_url || (`/m/dashboard?request_id=${encodeURIComponent(requestId)}`);
+                window.location.replace(nextUrl);
+            }, 450);
+        } catch (error) {
+            setMessage('서버 연결에 실패했습니다. 다시 시도해 주세요.', true);
+            btn.disabled = false;
+        }
+    }
+
+    document.getElementById('pin-input').addEventListener('input', function () {
+        this.value = (this.value || '').replace(/\D/g, '').slice(0, 4);
+    });
+
+    document.getElementById('pin-input').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            verifyPin();
+        }
+    });
+
+    notifyMobileConnected();
+</script>
+</body>
+</html>

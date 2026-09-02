@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>통합 결과 - 종합 건강 스크리닝</title>
+    <script>
+        (function () {
+            const saved = localStorage.getItem('theme');
+            document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+        })();
+    </script>
+    <style>
+        :root {
+            --primary: #007aff;
+            --bg: #f5f5f7;
+            --surface: #ffffff;
+            --text: #172033;
+            --sub: #667085;
+            --border: #d9e0ea;
+            --success: #138a52;
+            --success-soft: #e9f7ef;
+            --warning: #9a6700;
+            --warning-soft: #fff7dd;
+        }
+        [data-theme="dark"] {
+            --primary: #58a6ff;
+            --bg: #0f1115;
+            --surface: #171b22;
+            --text: #eef2f7;
+            --sub: #a7b0bf;
+            --border: #303846;
+            --success: #4fd18b;
+            --success-soft: #173126;
+            --warning: #f0c45c;
+            --warning-soft: #342c17;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; width: 100%; min-height: 800px; background: var(--bg); color: var(--text); font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .page { width: 100%; min-height: 800px; padding: 46px 66px 40px; display: flex; flex-direction: column; }
+        .eyebrow { color: var(--primary); font-weight: 800; margin-bottom: 8px; }
+        h1 { margin: 0; font-size: 2.45rem; letter-spacing: 0; }
+        .lead { margin: 12px 0 30px; color: var(--sub); font-size: 1.05rem; }
+        .summary-list { display: grid; gap: 12px; }
+        .summary-row { min-height: 112px; display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: 22px; padding: 20px 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+        .modality { font-size: 1.25rem; font-weight: 900; }
+        .description { color: var(--sub); line-height: 1.55; }
+        .status { min-width: 104px; padding: 8px 12px; border-radius: 6px; text-align: center; font-size: 0.84rem; font-weight: 800; }
+        .status.ready { color: var(--success); background: var(--success-soft); }
+        .status.pending { color: var(--warning); background: var(--warning-soft); }
+        .notice { margin-top: 20px; padding: 17px 20px; border-left: 4px solid var(--primary); background: var(--surface); color: var(--sub); line-height: 1.55; }
+        footer { margin-top: auto; padding-top: 28px; display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+        .btn { min-height: 52px; padding: 0 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 800; cursor: pointer; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; min-width: 190px; }
+        @media (max-width: 768px) {
+            body { width: 100%; min-height: 100vh; }
+            .page { min-height: 100vh; padding: 24px 14px 28px; }
+            h1 { font-size: 1.85rem; }
+            .summary-row { min-height: 0; grid-template-columns: 1fr auto; gap: 9px 14px; padding: 17px 15px; }
+            .description { grid-column: 1 / -1; grid-row: 2; }
+            .status { min-width: 96px; }
+            footer { align-items: stretch; flex-direction: column; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <div class="eyebrow">종합 건강 스크리닝</div>
+        <h1>선택한 검사가 완료되었습니다</h1>
+        <p class="lead">영역별 분석 준비 상태와 확보된 결과를 확인하세요.</p>
+
+        <section id="summary-list" class="summary-list" aria-label="통합 검사 결과"></section>
+        <div class="notice">이 결과는 건강 상태 스크리닝 및 의료 의사결정 보조용입니다. 증상이 지속되거나 악화되면 의료 전문가의 진료를 받으세요.</div>
+
+        <footer>
+            <button class="btn" type="button" onclick="location.href='/'">홈으로</button>
+            <button id="restart-button" class="btn btn-primary" type="button">새 검사 시작</button>
+        </footer>
+    </main>
+
+    <script src="/static/js/screening-flow.js"></script>
+    <script>
+        const plan = ScreeningFlow.getPlan();
+        const completed = ScreeningFlow.getCompleted();
+        if (!plan.length) location.replace('/screening');
+
+        function descriptionFor(modality, done) {
+            if (!done) return '검사가 완료되지 않았습니다.';
+            if (modality.id === 'eye') {
+                return sessionStorage.getItem('screening_result_eye_status') === 'ready'
+                    ? '기존 안구 AI 분석 결과와 리포트에서 상세 내용을 확인할 수 있습니다.'
+                    : '안구 검사 단계는 종료되었지만 사용할 수 있는 분석 데이터가 없습니다.';
+            }
+            return '검사 이미지가 확보되었습니다. 학습 모델 연결 후 예측 결과가 이 흐름에 추가됩니다.';
+        }
+
+        ScreeningFlow.getConfig().then((config) => {
+            const byId = Object.fromEntries((config.modalities || []).map((item) => [item.id, item]));
+            const list = document.getElementById('summary-list');
+            plan.forEach((id) => {
+                const modality = byId[id] || { id, label: ScreeningFlow.LABELS[id] };
+                const done = completed.includes(id);
+                const row = document.createElement('article');
+                row.className = 'summary-row';
+
+                const title = document.createElement('div');
+                title.className = 'modality';
+                title.textContent = modality.label;
+                const description = document.createElement('div');
+                description.className = 'description';
+                description.textContent = descriptionFor(modality, done);
+                const status = document.createElement('div');
+                const eyeReady = id !== 'eye' || sessionStorage.getItem('screening_result_eye_status') === 'ready';
+                status.className = `status ${done && eyeReady ? 'ready' : 'pending'}`;
+                status.textContent = !done ? '미완료' : (id === 'eye' ? (eyeReady ? '분석 완료' : '결과 없음') : '촬영 완료');
+                row.append(title, description, status);
+                list.appendChild(row);
+            });
+        }).catch(() => {
+            document.getElementById('summary-list').textContent = '검사 요약을 불러오지 못했습니다.';
+        });
+
+        document.getElementById('restart-button').addEventListener('click', () => {
+            ScreeningFlow.begin([]);
+            location.href = '/screening';
+        });
+    </script>
+    <script src="/static/js/timeout.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모바일 연동 완료</title>
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --sub: #64748b;
+            --card: #ffffff;
+            --border: #dbe2ea;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 440px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 24px 18px;
+            text-align: center;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 1.35rem;
+            color: var(--primary);
+        }
+
+        p {
+            margin: 0;
+            color: var(--sub);
+            line-height: 1.5;
+        }
+
+        .meta {
+            margin-top: 12px;
+            font-size: 0.84rem;
+            color: #94a3b8;
+            word-break: break-all;
+        }
+
+        .btn-wrap {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .btn {
+            min-height: 48px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.98rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1 data-i18n="m_dashboard_title">✅ 모바일 인증 완료</h1>
+    <p>키오스크와 모바일 연동이 정상적으로 완료되었습니다.<br>키오스크 화면에서 다음 단계를 진행해 주세요.</p>
+    <div id="meta" class="meta"></div>
+
+    <div class="btn-wrap">
+        <button class="btn btn-primary" type="button" onclick="location.href='/'">키오스크 홈 열기</button>
+        <button class="btn btn-secondary" type="button" onclick="location.href='/m'">PIN 재인증 화면</button>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const params = new URLSearchParams(window.location.search);
+        const requestId = params.get('request_id') || '';
+        const metaEl = document.getElementById('meta');
+        if (requestId) {
+            metaEl.textContent = `연동 세션: ${requestId}`;
+        }
+    })();
+</script>
+<script src="/static/js/timeout.js"></script>
+</body>
+</html>

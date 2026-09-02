@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>통합 문진 - 종합 건강 스크리닝</title>
+    <script>
+        (function () {
+            const saved = localStorage.getItem('theme');
+            document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+        })();
+    </script>
+    <style>
+        :root {
+            --primary: #007aff;
+            --bg: #f5f5f7;
+            --surface: #ffffff;
+            --text: #172033;
+            --sub: #667085;
+            --border: #d9e0ea;
+            --field: #f9fafb;
+        }
+        [data-theme="dark"] {
+            --primary: #58a6ff;
+            --bg: #0f1115;
+            --surface: #171b22;
+            --text: #eef2f7;
+            --sub: #a7b0bf;
+            --border: #303846;
+            --field: #11161d;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; width: 100%; min-height: 800px; background: var(--bg); color: var(--text); font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .page { width: 100%; min-height: 800px; padding: 34px 64px 42px; }
+        header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+        .eyebrow { color: var(--primary); font-size: 0.95rem; font-weight: 800; margin-bottom: 8px; }
+        h1 { margin: 0; font-size: 2.25rem; letter-spacing: 0; }
+        .selected-summary { color: var(--sub); font-weight: 700; text-align: right; }
+        form { display: grid; gap: 16px; }
+        .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px; }
+        .section h2 { margin: 0 0 18px; color: var(--primary); font-size: 1.2rem; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+        .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .field { display: flex; flex-direction: column; gap: 7px; }
+        .field.full { grid-column: 1 / -1; }
+        label, legend { font-weight: 700; font-size: 0.9rem; }
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: var(--field);
+            color: var(--text);
+            border-radius: 8px;
+            min-height: 44px;
+            padding: 10px 12px;
+            font: inherit;
+        }
+        textarea { min-height: 76px; resize: vertical; }
+        fieldset { border: 0; padding: 0; margin: 0; }
+        .check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+        .check-item { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); font-weight: 600; }
+        .check-item input { width: 18px; min-height: 18px; margin: 0; }
+        .footer { position: sticky; bottom: 0; margin-top: 22px; padding: 16px 0 0; background: var(--bg); display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+        .note { color: var(--sub); font-size: 0.88rem; line-height: 1.45; }
+        .actions { display: flex; gap: 10px; }
+        .btn { min-height: 50px; border-radius: 8px; padding: 0 24px; font-size: 1rem; font-weight: 800; border: 1px solid var(--border); cursor: pointer; }
+        .btn-back { background: var(--surface); color: var(--text); }
+        .btn-next { background: var(--primary); color: #fff; border-color: var(--primary); min-width: 210px; }
+        .error { display: none; color: #b42318; font-weight: 700; margin-top: 10px; }
+        [hidden] { display: none !important; }
+        @media (max-width: 768px) {
+            body { width: 100%; min-height: 100vh; }
+            .page { min-height: 100vh; padding: 22px 14px 28px; }
+            header { align-items: flex-start; flex-direction: column; }
+            h1 { font-size: 1.8rem; }
+            .selected-summary { text-align: left; }
+            .grid, .grid.three, .check-grid { grid-template-columns: 1fr; }
+            .section { padding: 17px 14px; }
+            .footer { align-items: stretch; flex-direction: column; }
+            .actions { display: grid; grid-template-columns: 1fr 1.5fr; }
+            .btn { padding: 0 12px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header>
+            <div>
+                <div class="eyebrow">종합 건강 스크리닝 · 통합 문진</div>
+                <h1>현재 상태를 입력해 주세요</h1>
+            </div>
+            <div id="selected-summary" class="selected-summary"></div>
+        </header>
+
+        <form id="survey-form">
+            <section class="section">
+                <h2>기본 정보</h2>
+                <div class="grid three">
+                    <div class="field">
+                        <label for="age">나이 *</label>
+                        <input id="age" type="number" min="1" max="120" required>
+                    </div>
+                    <div class="field">
+                        <label for="gender">성별</label>
+                        <select id="gender"><option>남성</option><option>여성</option><option>응답하지 않음</option></select>
+                    </div>
+                    <div class="field">
+                        <label for="conditions">기저질환</label>
+                        <input id="conditions" type="text" placeholder="당뇨, 고혈압 등">
+                    </div>
+                    <div class="field">
+                        <label for="smoking">흡연</label>
+                        <select id="smoking"><option>비흡연</option><option>과거 흡연</option><option>흡연</option></select>
+                    </div>
+                    <div class="field">
+                        <label for="drinking">음주 빈도</label>
+                        <select id="drinking"><option>안함</option><option>가끔</option><option>자주</option></select>
+                    </div>
+                    <div class="field">
+                        <label for="common-notes">공통 참고사항</label>
+                        <input id="common-notes" type="text" placeholder="복용 약, 알레르기 등">
+                    </div>
+                </div>
+            </section>
+
+            <section id="eye-section" class="section" hidden>
+                <h2>안구 문진</h2>
+                <div class="grid three">
+                    <div class="field">
+                        <label for="eye-wearing">안경/렌즈 착용</label>
+                        <select id="eye-wearing"><option>미착용</option><option>안경 착용</option><option>콘택트렌즈 착용</option></select>
+                    </div>
+                    <div class="field">
+                        <label for="vision-left">좌안 교정시력</label>
+                        <input id="vision-left" type="number" step="0.1" min="0" max="3" placeholder="예: 1.0">
+                    </div>
+                    <div class="field">
+                        <label for="vision-right">우안 교정시력</label>
+                        <input id="vision-right" type="number" step="0.1" min="0" max="3" placeholder="예: 1.0">
+                    </div>
+                    <div class="field full">
+                        <label for="eye-surgery">안구 수술 이력</label>
+                        <input id="eye-surgery" type="text" placeholder="수술명 및 시기">
+                    </div>
+                </div>
+                <fieldset style="margin-top:18px">
+                    <legend>현재 안구 증상</legend>
+                    <div class="check-grid">
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="시야 흐림">시야 흐림</label>
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="충혈 또는 가려움">충혈 또는 가려움</label>
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="건조함">건조함</label>
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="통증 또는 시림">통증 또는 시림</label>
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="눈부심">눈부심</label>
+                        <label class="check-item"><input type="checkbox" name="eye-symptoms" value="분비물">분비물</label>
+                    </div>
+                </fieldset>
+                <div class="field" style="margin-top:14px"><label for="eye-notes">기타 안구 불편</label><textarea id="eye-notes"></textarea></div>
+            </section>
+
+            <section id="skin-section" class="section" hidden>
+                <h2>피부 문진</h2>
+                <div class="grid">
+                    <div class="field"><label for="skin-site">촬영 부위</label><input id="skin-site" type="text" placeholder="얼굴, 팔, 손, 몸통 등"></div>
+                    <div class="field"><label for="skin-duration">증상 지속 기간</label><input id="skin-duration" type="text" placeholder="예: 약 2주"></div>
+                    <div class="field full"><label for="skin-changes">크기·색상·형태 변화</label><input id="skin-changes" type="text"></div>
+                </div>
+                <fieldset style="margin-top:18px">
+                    <legend>현재 피부 증상</legend>
+                    <div class="check-grid">
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="가려움">가려움</label>
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="통증">통증</label>
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="붉어짐">붉어짐</label>
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="각질">각질</label>
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="진물">진물</label>
+                        <label class="check-item"><input type="checkbox" name="skin-symptoms" value="출혈">출혈</label>
+                    </div>
+                </fieldset>
+                <div class="field" style="margin-top:14px"><label for="skin-notes">기타 피부 불편</label><textarea id="skin-notes"></textarea></div>
+            </section>
+
+            <section id="scalp-section" class="section" hidden>
+                <h2>두피 문진</h2>
+                <div class="grid">
+                    <div class="field"><label for="scalp-site">촬영 위치</label><select id="scalp-site"><option>정수리</option><option>앞머리</option><option>측면</option><option>후두부</option><option>기타</option></select></div>
+                    <div class="field"><label for="scalp-duration">증상 지속 기간</label><input id="scalp-duration" type="text" placeholder="예: 약 3개월"></div>
+                    <div class="field full"><label for="scalp-treatment">염색·시술·치료 이력</label><input id="scalp-treatment" type="text"></div>
+                </div>
+                <fieldset style="margin-top:18px">
+                    <legend>현재 두피 증상</legend>
+                    <div class="check-grid">
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="가려움">가려움</label>
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="각질 또는 비듬">각질 또는 비듬</label>
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="붉어짐">붉어짐</label>
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="통증">통증</label>
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="모발 빠짐 증가">모발 빠짐 증가</label>
+                        <label class="check-item"><input type="checkbox" name="scalp-symptoms" value="염증 또는 진물">염증 또는 진물</label>
+                    </div>
+                </fieldset>
+                <div class="field" style="margin-top:14px"><label for="scalp-notes">기타 두피 불편</label><textarea id="scalp-notes"></textarea></div>
+            </section>
+        </form>
+
+        <div id="form-error" class="error"></div>
+        <footer class="footer">
+            <div class="note">입력 내용은 선택한 검사 결과와 함께 저장됩니다.</div>
+            <div class="actions">
+                <button class="btn btn-back" type="button" onclick="location.href='/screening'">검사 다시 선택</button>
+                <button id="submit-button" class="btn btn-next" type="button">문진 완료</button>
+            </div>
+        </footer>
+    </main>
+
+    <script src="/static/js/screening-flow.js"></script>
+    <script>
+        const plan = ScreeningFlow.getPlan();
+        if (!plan.length) location.replace('/screening');
+
+        const labels = plan.map((id) => ScreeningFlow.LABELS[id]);
+        document.getElementById('selected-summary').textContent = `선택 검사: ${labels.join(' · ')}`;
+        plan.forEach((id) => {
+            const section = document.getElementById(`${id}-section`);
+            if (section) section.hidden = false;
+        });
+
+        function values(name) {
+            return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
+        }
+
+        function value(id) {
+            const element = document.getElementById(id);
+            return element ? element.value.trim() : '';
+        }
+
+        function buildPayload() {
+            const eye = {
+                wearing: value('eye-wearing'),
+                vision_left: value('vision-left'),
+                vision_right: value('vision-right'),
+                surgery_history: value('eye-surgery'),
+                symptoms: values('eye-symptoms'),
+                notes: value('eye-notes')
+            };
+            return {
+                screening_version: 1,
+                screening_types: plan,
+                age: value('age'),
+                gender: value('gender'),
+                conditions: value('conditions'),
+                smoking: value('smoking'),
+                drinking: value('drinking'),
+                other_notes: value('common-notes'),
+                wearing: eye.wearing,
+                vision_left: eye.vision_left,
+                vision_right: eye.vision_right,
+                surgery_history: eye.surgery_history,
+                symptoms: eye.symptoms,
+                eye,
+                skin: {
+                    body_site: value('skin-site'),
+                    duration: value('skin-duration'),
+                    changes: value('skin-changes'),
+                    symptoms: values('skin-symptoms'),
+                    notes: value('skin-notes')
+                },
+                scalp: {
+                    scalp_site: value('scalp-site'),
+                    duration: value('scalp-duration'),
+                    treatment_history: value('scalp-treatment'),
+                    symptoms: values('scalp-symptoms'),
+                    notes: value('scalp-notes')
+                }
+            };
+        }
+
+        document.getElementById('submit-button').addEventListener('click', async () => {
+            const error = document.getElementById('form-error');
+            const age = document.getElementById('age');
+            if (!age.reportValidity()) return;
+
+            const userId = (sessionStorage.getItem('user_id') || '').trim();
+            if (!userId) {
+                error.textContent = '사용자 인증 정보가 없습니다. 다시 로그인해 주세요.';
+                error.style.display = 'block';
+                return;
+            }
+
+            const button = document.getElementById('submit-button');
+            button.disabled = true;
+            error.style.display = 'none';
+            const survey = buildPayload();
+
+            try {
+                const response = await fetch('/api/survey', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, survey })
+                });
+                const result = await response.json();
+                if (!response.ok || result.status !== 'ok') throw new Error(result.message || '문진 저장 실패');
+                sessionStorage.setItem('screening_survey', JSON.stringify(result.survey));
+                sessionStorage.setItem('user_age', String(survey.age));
+                ScreeningFlow.goTo(plan[0]);
+            } catch (requestError) {
+                error.textContent = `문진 저장에 실패했습니다. ${requestError.message || requestError}`;
+                error.style.display = 'block';
+                button.disabled = false;
+            }
+        });
+    </script>
+    <script src="/static/js/timeout.js"></script>
+</body>
+</html>

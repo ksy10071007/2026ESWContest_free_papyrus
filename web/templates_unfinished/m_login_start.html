@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>본인 인증 - AI 안구 건강 스크리닝</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text-dark: #1d1d1f;
+            --text-sub: #64748b;
+            --border: #d2d2d7;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text-dark: #e5e7eb;
+            --text-sub: #aab3c2;
+            --border: #2a3240;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-dark);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 4000;
+            display: none;
+        }
+
+        .confirm-toast.show { display: block; }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            /* 고정 크기(1280x800)와 overflow 제거하여 반응형 유동성 확보 */
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .auth-container {
+            /* 모바일 화면 너비에 맞춰 유동적으로 변화하도록 %와 max-width 설정 */
+            width: 92%;
+            max-width: 700px;
+            padding: 60px 40px;
+            background: var(--card);
+            border-radius: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            text-align: center;
+            box-sizing: border-box;
+            margin: 20px auto;
+        }
+
+        .auth-header h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 15px; }
+        .auth-header p { font-size: 1.2rem; color: var(--text-sub); margin-bottom: 50px; }
+
+        .input-group { text-align: left; margin-bottom: 35px; }
+        .input-group label { display: block; font-weight: 700; margin-bottom: 12px; font-size: 1.1rem; }
+        
+        .input-group input {
+            width: 100%;
+            padding: 22px;
+            border: 2px solid var(--border);
+            border-radius: 18px;
+            font-size: 1.4rem;
+            box-sizing: border-box;
+            transition: all 0.3s;
+            background-color: #fafafa;
+        }
+
+        [data-theme="dark"] .input-group input {
+            background-color: #0f172a !important;
+            color: var(--text-dark) !important;
+            border-color: #334155;
+            -webkit-text-fill-color: var(--text-dark);
+            caret-color: var(--text-dark);
+            color-scheme: dark;
+        }
+        [data-theme="dark"] .info-message { background: #0f172a; }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: #ffffff;
+        }
+
+        [data-theme="dark"] .input-group input:focus {
+            background-color: #111827 !important;
+            color: var(--text-dark) !important;
+            -webkit-text-fill-color: var(--text-dark);
+        }
+
+        [data-theme="dark"] .input-group input::placeholder {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] .input-group input:-webkit-autofill,
+        [data-theme="dark"] .input-group input:-webkit-autofill:hover,
+        [data-theme="dark"] .input-group input:-webkit-autofill:focus {
+            -webkit-text-fill-color: var(--text-dark);
+            -webkit-box-shadow: 0 0 0 1000px #111827 inset;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        .info-message {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 18px;
+            margin-bottom: 40px;
+            text-align: left;
+            border-left: 5px solid var(--primary);
+        }
+
+        .btn-confirm {
+            width: 100%;
+            background: linear-gradient(135deg, #007AFF, #2563eb);
+            color: white;
+            border: none;
+            padding: 22px;
+            border-radius: 18px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 20px rgba(0, 122, 255, 0.2);
+        }
+
+        .btn-back {
+            display: inline-block;
+            color: var(--text-sub);
+            text-decoration: none;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
+                overflow-y: auto;
+                display: block;
+                padding: 14px;
+                box-sizing: border-box;
+            }
+
+            .auth-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 22px 16px;
+                border-radius: 18px;
+                box-sizing: border-box;
+            }
+
+            .auth-header h2 { font-size: 1.8rem; margin-bottom: 10px; }
+            .auth-header p { font-size: 0.98rem; margin-bottom: 24px; }
+            .input-group { margin-bottom: 18px; }
+            .input-group input {
+                min-height: 48px;
+                padding: 14px;
+                font-size: 1rem;
+            }
+
+            .btn-confirm {
+                min-height: 48px;
+                padding: 14px;
+                font-size: 1.06rem;
+                margin-bottom: 12px;
+            }
+
+            .btn-back { font-size: 0.96rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-header">
+        <h2>본인 인증</h2>
+        <p data-i18n="login_instruction">기존 기록 조회 및 설문 시작을 위해 정보를 입력해주세요.</p>
+    </div>
+
+    <form id="loginForm" onsubmit="return handleLogin(event)">
+        <div class="input-group">
+            <label for="identifier" data-i18n="label_identifier">전화번호 또는 이메일</label>
+            <input type="text" id="identifier" name="identifier" 
+                   placeholder="010-1234-5678 또는 email@example.com" required>
+        </div>
+
+        <div class="input-group" id="admin-password-group" style="display:none;">
+            <label for="admin-password" data-i18n="label_admin_password">관리자 비밀번호</label>
+            <input type="password" id="admin-password" name="admin-password" placeholder="관리자 비밀번호를 입력하세요" autocomplete="current-password">
+        </div>
+
+        <div class="info-message">
+            <p style="margin:0; font-size:1rem; color:var(--text-sub); line-height:1.6;" data-i18n="login_privacy_note" data-i18n-html="true">
+                ℹ️ <strong>비식별화 아키텍처</strong>를 통해 개인정보를 보호합니다.<br>
+                입력하신 정보는 문진 결과 데이터베이스 매칭에 활용됩니다.
+            </p>
+        </div>
+
+        <div class="action-section">
+            <button type="submit" class="btn-confirm" data-i18n="btn_confirm_and_survey">인증 완료 및 설문 시작</button>
+            <div>
+                <a href="/" class="btn-back" data-i18n="btn_back">이전으로 돌아가기</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+    <div id="confirm-toast-message" class="confirm-toast-message"></div>
+    <div class="confirm-toast-actions">
+        <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel">취소</button>
+        <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">확인</button>
+    </div>
+</div>
+
+<script>
+    function showToastPopup(message, options = {}) {
+        return new Promise((resolve) => {
+            const toast = document.getElementById('confirm-toast');
+            const msgEl = document.getElementById('confirm-toast-message');
+            const okBtn = document.getElementById('confirm-toast-ok');
+            const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+            if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                if (options.hideCancel) {
+                    window.alert(message);
+                    resolve(true);
+                } else {
+                    resolve(window.confirm(message));
+                }
+                return;
+            }
+
+            const confirmText = options.confirmText || '확인';
+            const cancelText = options.cancelText || '취소';
+            const hideCancel = !!options.hideCancel;
+
+            msgEl.textContent = message;
+            okBtn.textContent = confirmText;
+            cancelBtn.textContent = cancelText;
+            cancelBtn.style.display = hideCancel ? 'none' : 'inline-block';
+
+            toast.classList.add('show');
+
+            const cleanup = (result) => {
+                toast.classList.remove('show');
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                resolve(result);
+            };
+
+            okBtn.onclick = () => cleanup(true);
+            cancelBtn.onclick = () => cleanup(false);
+        });
+    }
+
+    async function showAlert(message) {
+        await showToastPopup(message, { hideCancel: true, confirmText: '확인' });
+    }
+
+    async function showConfirm(message, confirmText = '확인') {
+        return showToastPopup(message, { hideCancel: false, confirmText, cancelText: '취소' });
+    }
+
+    async function handleLogin(event) {
+        event.preventDefault(); 
+        
+        const identifier = document.getElementById('identifier').value.trim();
+        const normalized = identifier.toLowerCase();
+        const adminPassword = document.getElementById('admin-password').value;
+
+        function setSessionIdentity(userId, role) {
+            try {
+                sessionStorage.setItem('user_id', userId);
+                sessionStorage.setItem('user_role', role);
+                if (role !== 'admin') {
+                    sessionStorage.removeItem('admin_csrf_token');
+                }
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('user_role');
+            } catch (e) {}
+        }
+
+        // 관리자 로그인 분기
+        if (normalized === 'admin') {
+            if (!adminPassword) {
+                await showAlert('관리자 비밀번호를 입력해 주세요.');
+                return false;
+            }
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier: 'admin', password: adminPassword })
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'ok' || data.role !== 'admin') {
+                    throw new Error(data.message || '관리자 로그인 실패');
+                }
+
+                setSessionIdentity('admin', 'admin');
+                if (data.csrf_token) {
+                    try { sessionStorage.setItem('admin_csrf_token', data.csrf_token); } catch (e) {}
+                }
+                await showAlert('관리자 로그인 성공! 설정 페이지로 이동합니다.');
+                window.location.href = '/admin/config';
+                return false;
+            } catch (error) {
+                await showAlert(`관리자 로그인 실패: ${error.message || error}`);
+                return false;
+            }
+        }
+        
+        // 유효성 검사 규칙
+        const phoneRegex = /^010-\d{3,4}-\d{4}$|^010\d{8}$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (phoneRegex.test(identifier) || emailRegex.test(identifier)) {
+            // 사용자 식별자를 로컬 스토리지에 저장하여 나중에 survey에서 활용
+            setSessionIdentity(identifier, 'user');
+            
+            // 성공 알림 후 설문 페이지(survey)로 이동
+            await showAlert("인증 성공! 사전 설문 페이지로 이동합니다.");
+            window.location.href = '/survey'; 
+        } else {
+            await showAlert("올바른 전화번호(010-0000-0000) 또는 이메일 형식을 입력해주세요.");
+        }
+        
+        return false;
+    }
+
+    (function bindAdminPasswordField() {
+        const identifierInput = document.getElementById('identifier');
+        const adminGroup = document.getElementById('admin-password-group');
+
+        if (!identifierInput || !adminGroup) return;
+
+        const toggle = () => {
+            const isAdmin = String(identifierInput.value || '').trim().toLowerCase() === 'admin';
+            adminGroup.style.display = isAdmin ? 'block' : 'none';
+            if (!isAdmin) {
+                const passInput = document.getElementById('admin-password');
+                if (passInput) passInput.value = '';
+            }
+        };
+
+        identifierInput.addEventListener('input', toggle);
+        toggle();
+    })();
+</script>
+
+<script>
+    (function () {
+        const root = document.documentElement;
+
+        function currentTheme() {
+            const t = root.getAttribute('data-theme');
+            return (t === 'dark' || t === 'light') ? t : 'light';
+        }
+
+        function applyTheme(theme, persist) {
+            root.setAttribute('data-theme', theme);
+            if (persist) {
+                try { localStorage.setItem('theme', theme); } catch (e) {}
+            }
+
+            const btn = document.getElementById('global-theme-toggle');
+            if (!btn) return;
+            const icon = btn.querySelector('[data-role="icon"]');
+            const label = btn.querySelector('[data-role="label"]');
+            if (theme === 'dark') {
+                if (icon) icon.textContent = '☀️';
+                    if (label) label.textContent = '라이트 모드';
+            } else {
+                if (icon) icon.textContent = '🌙';
+                    if (label) label.textContent = '다크 모드';
+            }
+        }
+
+        applyTheme(currentTheme(), false);
+    })();
+</script>
+
+</body>
+</html>

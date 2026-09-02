@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 안구 건강 스크리닝 결과</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/chat-widget.css">
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <script defer src="/static/js/chat-widget.js"></script>
+    <style>
+        :root { 
+            --primary: #007AFF; 
+            --bg: #f5f5f7; 
+            --card: #ffffff; 
+            --text: #1d1d1f; 
+            --accent: #28cd41; 
+            --danger: #ff3b30; 
+            --warning: #ff9500; 
+            --border: #d2d2d7; 
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --accent: #34d399;
+            --danger: #f87171;
+            --warning: #fbbf24;
+            --border: #2a3240;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 3500;
+            display: none;
+        }
+
+        .confirm-toast.show { display: block; }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        [data-theme="dark"] .left-panel { background: #020617; }
+        [data-theme="dark"] #captured-image { background: #0b1220; }
+        [data-theme="dark"] .camera-bottom-btns { background: #111827; }
+        [data-theme="dark"] .btn-camera-sub { background: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .status-item { border-bottom-color: #334155; }
+        [data-theme="dark"] .map-panel,
+        [data-theme="dark"] .map-frame { background: #0f172a; }
+        [data-theme="dark"] .map-header { background: #111827; }
+        [data-theme="dark"] .map-title { color: #cbd5e1; }
+
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            display: flex; 
+            width: 1280px; 
+            height: 800px; 
+            overflow: hidden; 
+        }
+
+        /* 왼쪽: 이미지 표시 영역 */
+        .left-panel { 
+            flex: 1.4; 
+            display: flex; 
+            flex-direction: column; 
+            background: #000; 
+            position: relative; 
+        }
+
+        .captured-media {
+            width: 100%;
+            height: 82%;
+            position: relative;
+            background: #111;
+            overflow: hidden;
+        }
+
+        #captured-image { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            background: #111; 
+            display: block;
+        }
+
+        .cam-overlay-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .cam-overlay-layer.show {
+            display: block;
+        }
+
+        .cam-overlay-full {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            opacity: 0.48;
+            object-fit: contain;
+        }
+
+        .captured-empty-hint {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            font-weight: 700;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: none;
+            pointer-events: none;
+        }
+
+        .camera-bottom-btns { 
+            height: 18%; 
+            background: #ffffff; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-around; 
+            padding: 0 20px; 
+            gap: 15px; 
+            border-top: 1px solid var(--border); 
+        }
+
+        .eye-select-row {
+            display: flex;
+            gap: 10px;
+            padding: 12px;
+            background: #ffffff;
+            border-top: 1px solid var(--border);
+        }
+
+        .eye-select-btn {
+            flex: 1;
+            border: none;
+            background: #f2f2f7;
+            color: #3a3a3c;
+            border-radius: 12px;
+            min-height: 44px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .eye-select-btn:hover:not(:disabled) {
+            background: #e5e7eb;
+            transform: translateY(-1px);
+        }
+
+        .eye-select-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .eye-select-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 8px 16px rgba(0, 122, 255, 0.18);
+        }
+
+        .eye-select-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        [data-theme="dark"] .eye-select-row {
+            background: #111827;
+            border-top-color: #334155;
+        }
+
+        [data-theme="dark"] .eye-select-btn {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        [data-theme="dark"] .eye-select-btn:hover:not(:disabled) {
+            background: #3f4f67;
+        }
+
+        [data-theme="dark"] .eye-select-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+        }
+
+        .cam-toggle-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #475569;
+        }
+
+        /* 오른쪽: 데이터 대시보드 */
+        .right-panel { 
+            flex: 1; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            background: var(--bg); 
+            border-left: 1px solid var(--border); 
+            overflow-y: auto; 
+        }
+
+        .card { 
+            background: var(--card); 
+            padding: 18px; 
+            border-radius: 18px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+        }
+
+        h2 { margin: 0 0 12px 0; font-size: 1.1rem; color: var(--primary); }
+
+        .status-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #f2f2f7; 
+            font-size: 0.95rem; 
+        }
+
+        .status-tag { font-weight: bold; }
+        .tag-normal { color: var(--accent); } 
+        .tag-danger { color: var(--danger); } 
+        .tag-warning { color: var(--warning); }
+        .red-level-normal { color: #16a34a; font-weight: 700; }
+        .red-level-mild { color: #ca8a04; font-weight: 700; }
+        .red-level-severe { color: #ea580c; font-weight: 700; }
+        .red-level-very-severe { color: #dc2626; font-weight: 800; }
+
+        /* 하단 버튼 스타일 */
+        .btn { border: none; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-camera-sub { flex: 1; height: 70%; background: #f2f2f7; color: #3a3a3c; }
+        .btn-retake { background: #fdf2f2; color: var(--danger); border: 1px solid rgba(255, 59, 48, 0.2); }
+        .btn-main { width: 100%; padding: 20px; background: var(--primary); color: white; font-size: 1.1rem; }
+
+        .update-notice {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .cam-toggle-btn {
+            width: 100%;
+            margin-top: 12px;
+            background: #0f766e;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .map-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 2000;
+            background: rgba(15, 23, 42, 0.65);
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            box-sizing: border-box;
+        }
+
+        .map-panel {
+            width: min(1200px, 100%);
+            height: min(760px, 100%);
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+        }
+
+        .map-header {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+
+        .map-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .map-close-btn {
+            border: none;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .map-frame {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: #fff;
+        }
+
+        input[type="number"] { width: 40%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); text-align: center; }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .left-panel,
+            .right-panel {
+                width: 100%;
+                flex: none;
+            }
+
+            .left-panel {
+                min-height: 300px;
+            }
+
+            #captured-image {
+                height: clamp(220px, 44vh, 360px);
+                min-height: 220px;
+            }
+
+            .camera-bottom-btns {
+                height: auto;
+                padding: 10px 12px;
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+                justify-content: stretch;
+            }
+
+            .eye-select-row {
+                padding: 10px 12px;
+                gap: 8px;
+            }
+
+            .eye-select-btn {
+                min-height: 48px;
+                font-size: 0.9rem;
+            }
+
+            .right-panel {
+                border-left: none;
+                border-top: 1px solid var(--border);
+                padding: 14px;
+            }
+
+            .btn,
+            .btn-camera-sub,
+            .btn-main {
+                min-height: 48px;
+            }
+
+            .btn-camera-sub {
+                width: 100%;
+                flex: none;
+                height: auto;
+                box-sizing: border-box;
+            }
+
+            .btn-main {
+                width: 100%;
+                padding: 14px;
+                box-sizing: border-box;
+            }
+
+            .right-panel .card,
+            .right-panel > div {
+                width: 100%;
+            }
+
+            .map-overlay {
+                padding: 12px;
+            }
+
+            .map-panel {
+                width: 100%;
+                height: min(90vh, 760px);
+            }
+        }
+
+        /* 추가 모바일 유동적 반응형 스타일 */
+        :root {
+            --safe-top: env(safe-area-inset-top, 0);
+            --safe-bottom: env(safe-area-inset-bottom, 0);
+            --safe-left: env(safe-area-inset-left, 0);
+            --safe-right: env(safe-area-inset-right, 0);
+            --fluid-padding: clamp(12px, 3vw, 24px);
+            --fluid-gap: clamp(10px, 2vw, 18px);
+            --fluid-radius: clamp(12px, 3vw, 20px);
+        }
+
+        @media screen and (max-width: 600px) {
+            body {
+                padding-top: max(var(--safe-top), 12px);
+                padding-bottom: max(var(--safe-bottom), 12px);
+                padding-left: max(var(--safe-left), 12px);
+                padding-right: max(var(--safe-right), 12px);
+            }
+
+            header,
+            .right-panel,
+            .left-panel {
+                width: 100%;
+            }
+
+            .left-panel {
+                min-height: 260px;
+            }
+
+            .captured-media {
+                height: clamp(220px, 42vh, 300px);
+            }
+
+            #captured-image {
+                height: 100%;
+            }
+
+            .captured-empty-hint {
+                width: min(88vw, 320px);
+                font-size: 0.9rem;
+                padding: 10px 12px;
+            }
+
+            .camera-bottom-btns {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+                justify-content: flex-start;
+                padding: 10px 12px;
+                height: auto;
+            }
+
+            .eye-select-row {
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 10px 12px;
+            }
+
+            .eye-select-btn {
+                min-height: 44px;
+                font-size: 0.88rem;
+                padding: 10px 12px;
+                flex: 1 1 48%;
+            }
+
+            .right-panel {
+                padding: 14px;
+                gap: 12px;
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+
+            .card {
+                padding: 16px;
+                border-radius: var(--fluid-radius);
+            }
+
+            .status-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .btn,
+            .btn-camera-sub,
+            .btn-main,
+            .cam-toggle-btn {
+                min-height: 48px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .btn-main {
+                padding: 14px;
+            }
+
+            .map-overlay {
+                padding: 10px;
+            }
+
+            .map-panel {
+                width: 100%;
+                height: min(88vh, 600px);
+            }
+        }
+
+        @media screen and (max-width: 420px) {
+            body {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            h1 { font-size: clamp(1.25rem, 5vw, 1.6rem); }
+            h2 { font-size: clamp(1rem, 4vw, 1.2rem); }
+
+            .camera-bottom-btns,
+            .eye-select-row {
+                padding: 8px 10px;
+            }
+
+            .eye-select-btn {
+                flex: 1 1 100%;
+                font-size: 0.85rem;
+            }
+
+            .btn-main {
+                font-size: 0.95rem;
+            }
+
+            .status-item {
+                font-size: 0.85rem;
+            }
+
+            .map-title {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media screen and (max-width: 320px) {
+            .captured-empty-hint {
+                font-size: 0.82rem;
+                padding: 8px 10px;
+            }
+
+            .camera-bottom-btns,
+            .eye-select-row {
+                gap: 6px;
+            }
+
+            .btn,
+            .cam-toggle-btn,
+            .btn-main {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="left-panel">
+        <div class="captured-media" id="captured-media">
+            <img id="captured-image" alt="진단 이미지">
+            <div id="cam-overlay-layer" class="cam-overlay-layer">
+                <img id="cam-overlay-yolo" class="cam-overlay-full" alt="원본 YOLO 히트맵 오버레이">
+            </div>
+            <div id="captured-empty-hint" class="captured-empty-hint" data-i18n="captured_image_empty">촬영된 원본 이미지가 없습니다. capture에서 얼굴 촬영을 먼저 진행해 주세요.</div>
+        </div>
+
+        <div class="eye-select-row">
+            <button id="btn-view-original" class="eye-select-btn active" onclick="setEyePhotoView('ORIGINAL')">🖼️ 원본 보기</button>
+            <button id="btn-view-left" class="eye-select-btn" onclick="setEyePhotoView('L')">👁️ 좌안 보기</button>
+            <button id="btn-view-right" class="eye-select-btn" onclick="setEyePhotoView('R')">👁️ 우안 보기</button>
+        </div>
+
+        <div class="camera-bottom-btns">
+            <button class="btn btn-camera-sub btn-retake" onclick="retakePhotos()" data-i18n="btn_retake_photos">🔄 안구 재촬영</button>
+            <button id="btn-generate-report" class="btn btn-camera-sub" onclick="generateReport()" data-i18n="btn_generate_report">📋 리포트 발행</button>
+            <button class="btn btn-camera-sub" onclick="openNearbyClinicMap()">📍 주변 안과</button>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="card">
+            <h2>🔍 자동 측정 데이터</h2>
+            <div style="font-size:0.9rem; color:#475569;">
+                <div data-i18n="redness_left">좌안 충혈도: <b id="redness-left">-</b> <span id="redness-left-level"></span></div>
+                <div style="margin-top:4px;" data-i18n="redness_right">우안 충혈도: <b id="redness-right">-</b> <span id="redness-right-level"></span></div>
+                <div style="margin-top:6px; font-size:0.8rem; color:#64748b;">
+                    기준: 정상(&lt;0.08) · 경미(0.08~&lt;0.14) · 심함(0.14~&lt;0.22) · 매우심함(≥0.22)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🤖 AI 질환 분석 결과</h2>
+            <div class="status-item"><span>일반 (Normal)</span><span id="ai-normal" class="status-tag tag-normal">분석 대기</span></div>
+            <div class="status-item"><span>결막염</span><span id="ai-conj" class="status-tag tag-normal">분석 대기</span></div>
+            <div class="status-item"><span>포도막염</span><span id="ai-uveitis" class="status-tag tag-normal">분석 대기</span></div>
+            <div class="status-item"><span>백내장</span><span id="ai-cataract" class="status-tag tag-normal">분석 대기</span></div>
+            <div class="status-item" style="border:none;"><span>다래끼</span><span id="ai-eyelid" class="status-tag tag-normal">분석 대기</span></div>
+
+            <button id="btn-cam-toggle" class="cam-toggle-btn" onclick="toggleGradCam()">🔥 히트맵 오버레이 보기</button>
+        </div>
+
+        <div style="margin-top: auto;">
+            <p id="update-notice" class="update-notice">
+                ※ 최신 분석 데이터 확인 중입니다.
+            </p>
+            <button id="btn-update-status" class="btn btn-main" onclick="updateData()">🔄 분석 데이터 상태 확인</button>
+        </div>
+    </div>
+
+    <div id="map-overlay" class="map-overlay" onclick="closeNearbyClinicMap(event)">
+        <div class="map-panel" onclick="event.stopPropagation()">
+            <div class="map-header">
+                <div class="map-title">📍 주변 안과 (네이버 지도)</div>
+                <button class="map-close-btn" onclick="closeNearbyClinicMap()">대시보드로 돌아가기</button>
+            </div>
+            <iframe
+                id="map-frame"
+                class="map-frame"
+                src="about:blank"
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"
+                title="네이버 지도"
+            ></iframe>
+        </div>
+    </div>
+
+    <div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+        <div id="confirm-toast-message" class="confirm-toast-message"></div>
+        <div class="confirm-toast-actions">
+            <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel">취소</button>
+            <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">확인</button>
+        </div>
+    </div>
+
+    <script>
+        let gradCamVisible = false;
+        let eyeViewMode = 'ORIGINAL';
+        let eyeCropCache = { L: '', R: '' };
+
+        function showToastPopup(message, options = {}) {
+            return new Promise((resolve) => {
+                const toast = document.getElementById('confirm-toast');
+                const msgEl = document.getElementById('confirm-toast-message');
+                const okBtn = document.getElementById('confirm-toast-ok');
+                const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+                if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                    if (options.hideCancel) {
+                        window.alert(message);
+                        resolve(true);
+                    } else {
+                        resolve(window.confirm(message));
+                    }
+                    return;
+                }
+
+                const confirmText = options.confirmText || '확인';
+                const cancelText = options.cancelText || '취소';
+                const hideCancel = !!options.hideCancel;
+
+                msgEl.textContent = message;
+                okBtn.textContent = confirmText;
+                cancelBtn.textContent = cancelText;
+                cancelBtn.style.display = hideCancel ? 'none' : 'inline-block';
+
+                toast.classList.add('show');
+
+                const cleanup = (result) => {
+                    toast.classList.remove('show');
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    resolve(result);
+                };
+
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+            });
+        }
+
+        async function showAlert(message) {
+            await showToastPopup(message, { hideCancel: true, confirmText: '확인' });
+        }
+
+        async function showConfirm(message, confirmText = '확인') {
+            return showToastPopup(message, { hideCancel: false, confirmText, cancelText: '취소' });
+        }
+
+        function readSessionValue(key) {
+            const current = sessionStorage.getItem(key);
+            if (current !== null) return current;
+
+            const legacy = localStorage.getItem(key);
+            if (legacy !== null) {
+                sessionStorage.setItem(key, legacy);
+                localStorage.removeItem(key);
+            }
+            return legacy;
+        }
+
+        function writeSessionValue(key, value) {
+            sessionStorage.setItem(key, value);
+        }
+
+        function removeSessionValue(key) {
+            sessionStorage.removeItem(key);
+            localStorage.removeItem(key);
+        }
+
+        function setStatusTag(el, level, text) {
+            el.classList.remove('tag-normal', 'tag-warning', 'tag-danger');
+            el.classList.add(level);
+            el.textContent = text;
+        }
+
+        function confidenceToLevel(conf) {
+            if (conf >= 80) return 'tag-danger';
+            if (conf >= 60) return 'tag-warning';
+            return 'tag-normal';
+        }
+
+        function confidenceToNormalLevel(conf) {
+            if (conf >= 80) return 'tag-normal';
+            if (conf >= 60) return 'tag-warning';
+            return 'tag-danger';
+        }
+
+        function formatResultText(conf) {
+            const safeConf = readConfidencePercent(conf);
+            if (safeConf >= 80) return `의심(높음, ${safeConf.toFixed(1)}%)`;
+            if (safeConf >= 60) return `관찰 필요(${safeConf.toFixed(1)}%)`;
+            return `미검출/낮음(${safeConf.toFixed(1)}%)`;
+        }
+
+        function formatNormalText(conf) {
+            const safeConf = readConfidencePercent(conf);
+            if (safeConf >= 80) return `정상 가능성 높음(${safeConf.toFixed(1)}%)`;
+            if (safeConf >= 60) return `정상 가능성 중간(${safeConf.toFixed(1)}%)`;
+            return `정상 가능성 낮음(${safeConf.toFixed(1)}%)`;
+        }
+
+        function parseStoredJson(key) {
+            const raw = readSessionValue(key);
+            if (!raw) return null;
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                console.warn(`[Storage Parse Error] ${key}`, error);
+                return null;
+            }
+        }
+
+        function readNumber(value) {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : null;
+        }
+
+        function readConfidencePercent(value) {
+            const num = readNumber(value);
+            if (num === null) return 0;
+            return num <= 1 ? num * 100 : num;
+        }
+
+        function sanitizeCamUrl(url) {
+            if (!url) return '';
+            const text = String(url).trim();
+            if (!text) return '';
+            return text;
+        }
+
+        function getPhotoDataUrl() {
+            return readSessionValue('bilateral_capture') || '';
+        }
+
+        function hasUsableEye(eye) {
+            return !!(eye && parseBBox(eye.bbox));
+        }
+
+        function setActiveEyeViewButton(mode) {
+            const originalBtn = document.getElementById('btn-view-original');
+            const leftBtn = document.getElementById('btn-view-left');
+            const rightBtn = document.getElementById('btn-view-right');
+            if (!originalBtn || !leftBtn || !rightBtn) return;
+
+            originalBtn.classList.toggle('active', mode === 'ORIGINAL');
+            leftBtn.classList.toggle('active', mode === 'L');
+            rightBtn.classList.toggle('active', mode === 'R');
+        }
+
+        function updateEyeViewButtons(analysis) {
+            const originalBtn = document.getElementById('btn-view-original');
+            const leftBtn = document.getElementById('btn-view-left');
+            const rightBtn = document.getElementById('btn-view-right');
+            if (!originalBtn || !leftBtn || !rightBtn) return;
+
+            const hasPhoto = !!getPhotoDataUrl();
+
+            const leftAvailable = hasUsableEye(analysis?.left_eye);
+            const rightAvailable = hasUsableEye(analysis?.right_eye);
+
+            originalBtn.disabled = !hasPhoto;
+            leftBtn.disabled = !hasPhoto || !leftAvailable;
+            rightBtn.disabled = !hasPhoto || !rightAvailable;
+
+            originalBtn.title = hasPhoto ? '원본 사진 보기' : '원본 사진이 없습니다';
+            leftBtn.title = (!hasPhoto) ? '원본 사진이 없습니다' : (leftAvailable ? '좌안 사진 보기' : '좌안이 인식되지 않아 선택할 수 없습니다');
+            rightBtn.title = (!hasPhoto) ? '원본 사진이 없습니다' : (rightAvailable ? '우안 사진 보기' : '우안이 인식되지 않아 선택할 수 없습니다');
+
+            if (eyeViewMode === 'L' && leftBtn.disabled) {
+                eyeViewMode = 'ORIGINAL';
+            }
+            if (eyeViewMode === 'R' && rightBtn.disabled) {
+                eyeViewMode = 'ORIGINAL';
+            }
+        }
+
+        function updateCamToggleState(analysis) {
+            const btn = document.getElementById('btn-cam-toggle');
+            if (!btn) return;
+
+            if (eyeViewMode !== 'ORIGINAL') {
+                const eye = eyeViewMode === 'L' ? analysis?.left_eye : analysis?.right_eye;
+                const hasEfficientNetCam = !!sanitizeCamUrl(eye?.cam_image_url);
+                if (!hasEfficientNetCam) {
+                    btn.disabled = true;
+                    btn.textContent = '🔥 EfficientNet 히트맵 없음';
+                    return;
+                }
+
+                btn.disabled = false;
+                btn.textContent = gradCamVisible ? '🙈 EfficientNet 히트맵 숨기기' : '🔥 EfficientNet 히트맵 보기';
+                return;
+            }
+
+            const hasYoloCam = !!sanitizeCamUrl(analysis?.yolo_cam_image_url);
+            if (!hasYoloCam) {
+                btn.disabled = true;
+                btn.textContent = '🔥 YOLO 히트맵 없음';
+                return;
+            }
+
+            btn.disabled = false;
+            btn.textContent = gradCamVisible ? '🙈 YOLO 히트맵 숨기기' : '🔥 YOLO 히트맵 보기';
+        }
+
+        function loadImageFromDataUrl(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = dataUrl;
+            });
+        }
+
+        async function buildEyeCropDataUrl(dataUrl, bbox) {
+            const img = await loadImageFromDataUrl(dataUrl);
+            const [x1, y1, x2, y2] = bbox;
+            const minX = Math.max(0, Math.floor(Math.min(x1, x2)));
+            const minY = Math.max(0, Math.floor(Math.min(y1, y2)));
+            const maxX = Math.min(img.naturalWidth, Math.ceil(Math.max(x1, x2)));
+            const maxY = Math.min(img.naturalHeight, Math.ceil(Math.max(y1, y2)));
+            const cropW = Math.max(1, maxX - minX);
+            const cropH = Math.max(1, maxY - minY);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = cropW;
+            canvas.height = cropH;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+            return canvas.toDataURL('image/jpeg', 0.92);
+        }
+
+        function parseBBox(value) {
+            if (!Array.isArray(value) || value.length !== 4) return null;
+            const nums = value.map(v => Number(v));
+            if (nums.some(v => !Number.isFinite(v))) return null;
+            return nums;
+        }
+
+        function renderGradCamOverlay(analysis) {
+            const layer = document.getElementById('cam-overlay-layer');
+            const yoloEl = document.getElementById('cam-overlay-yolo');
+            if (!layer || !yoloEl) return;
+
+            if (eyeViewMode !== 'ORIGINAL') {
+                layer.classList.remove('show');
+                yoloEl.style.display = 'none';
+                yoloEl.removeAttribute('src');
+                return;
+            }
+
+            const yoloUrl = sanitizeCamUrl(analysis?.yolo_cam_image_url);
+            const canShowOverlay = gradCamVisible && !!yoloUrl;
+            if (canShowOverlay) {
+                yoloEl.src = yoloUrl;
+                yoloEl.style.display = 'block';
+            } else {
+                yoloEl.style.display = 'none';
+                yoloEl.removeAttribute('src');
+            }
+            layer.classList.toggle('show', canShowOverlay);
+        }
+
+        function getSelectedEyeData(analysis) {
+            if (eyeViewMode === 'L') return analysis?.left_eye || null;
+            if (eyeViewMode === 'R') return analysis?.right_eye || null;
+            return null;
+        }
+
+        function renderSelectedEyeImageForMode(analysis) {
+            if (eyeViewMode === 'ORIGINAL') {
+                renderGradCamOverlay(analysis);
+                return;
+            }
+
+            const imageEl = document.getElementById('captured-image');
+            const eye = getSelectedEyeData(analysis);
+            if (!imageEl || !eye) return;
+
+            const baseCrop = eyeCropCache[eyeViewMode] || '';
+            const camUrl = sanitizeCamUrl(eye?.cam_image_url);
+            if (gradCamVisible && camUrl) {
+                imageEl.src = camUrl;
+            } else if (baseCrop) {
+                imageEl.src = baseCrop;
+            }
+
+            renderGradCamOverlay(analysis);
+        }
+
+        function toggleGradCam(forceState) {
+            const btn = document.getElementById('btn-cam-toggle');
+            if (!btn) return;
+
+            if (btn.disabled) {
+                return;
+            }
+
+            if (typeof forceState === 'boolean') {
+                gradCamVisible = forceState;
+            } else {
+                gradCamVisible = !gradCamVisible;
+            }
+
+            const analysis = getStoredAnalysis();
+            updateCamToggleState(analysis);
+            renderSelectedEyeImageForMode(analysis);
+        }
+
+        async function setEyePhotoView(mode) {
+            const imageEl = document.getElementById('captured-image');
+            const hintEl = document.getElementById('captured-empty-hint');
+            const analysis = getStoredAnalysis();
+            const basePhoto = getPhotoDataUrl();
+            if (!imageEl) return;
+
+            if (!basePhoto) {
+                eyeViewMode = 'ORIGINAL';
+                setActiveEyeViewButton('ORIGINAL');
+                updateCamToggleState(analysis);
+                renderGradCamOverlay(analysis);
+                return;
+            }
+
+            try {
+                if (mode === 'ORIGINAL') {
+                    eyeViewMode = 'ORIGINAL';
+                    imageEl.onload = () => renderGradCamOverlay(analysis);
+                    imageEl.src = basePhoto;
+                    if (hintEl) hintEl.style.display = 'none';
+                } else {
+                    const eye = mode === 'L' ? analysis?.left_eye : analysis?.right_eye;
+                    const bbox = parseBBox(eye?.bbox);
+                    if (!bbox) {
+                        return;
+                    }
+
+                    eyeViewMode = mode;
+                    const cropDataUrl = await buildEyeCropDataUrl(basePhoto, bbox);
+                    eyeCropCache[mode] = cropDataUrl;
+                    imageEl.onload = () => renderSelectedEyeImageForMode(analysis);
+                    imageEl.src = (gradCamVisible && sanitizeCamUrl(eye?.cam_image_url)) ? sanitizeCamUrl(eye?.cam_image_url) : cropDataUrl;
+                    if (hintEl) hintEl.style.display = 'none';
+                }
+            } catch (error) {
+                eyeViewMode = 'ORIGINAL';
+                imageEl.onload = () => renderGradCamOverlay(analysis);
+                imageEl.src = basePhoto;
+                if (hintEl) hintEl.style.display = 'none';
+            }
+
+            setActiveEyeViewButton(eyeViewMode);
+            updateCamToggleState(analysis);
+            renderSelectedEyeImageForMode(analysis);
+        }
+
+        function getStoredAnalysis() {
+            const stored = parseStoredJson('bilateral_analysis') || {};
+            const leftStored = parseStoredJson('eye_analysis_L');
+            const rightStored = parseStoredJson('eye_analysis_R');
+
+            return {
+                ...stored,
+                left_eye: leftStored || stored.left_eye || null,
+                right_eye: rightStored || stored.right_eye || null
+            };
+        }
+
+        function hasUsableAnalysis(analysis) {
+            return !!(analysis && (analysis.left_eye || analysis.right_eye));
+        }
+
+        function isLatestDataReady() {
+            const analysis = getStoredAnalysis();
+            return hasUsableAnalysis(analysis);
+        }
+
+        function refreshReportAvailability() {
+            const reportBtn = document.getElementById('btn-generate-report');
+            const statusBtn = document.getElementById('btn-update-status');
+            const noticeEl = document.getElementById('update-notice');
+            const ready = isLatestDataReady();
+
+            reportBtn.disabled = !ready;
+
+            if (ready) {
+                noticeEl.textContent = '※ 최신 분석 데이터가 준비되어 바로 리포트를 발행할 수 있습니다.';
+                statusBtn.textContent = '✅ 최신 데이터 확인 완료';
+                statusBtn.style.background = '#16a34a';
+            } else {
+                noticeEl.textContent = '※ 아직 최신 분석 데이터가 없습니다. 좌/우 눈 분석을 먼저 완료해 주세요.';
+                statusBtn.textContent = '🔄 분석 데이터 상태 확인';
+                statusBtn.style.background = '';
+            }
+        }
+
+        function openNearbyClinicMap() {
+            const overlay = document.getElementById('map-overlay');
+            const frame = document.getElementById('map-frame');
+            if (!frame.src || frame.src === 'about:blank') {
+                frame.src = 'https://map.naver.com/v5/search/%EC%95%88%EA%B3%BC';
+            }
+            overlay.style.display = 'flex';
+        }
+
+        function closeNearbyClinicMap(event) {
+            if (event && event.target && event.target.id !== 'map-overlay') {
+                return;
+            }
+            document.getElementById('map-overlay').style.display = 'none';
+        }
+
+        function extractDiseaseScores(analysis) {
+            const scores = {
+                normal: 0,
+                conj: 0,
+                uveitis: 0,
+                eyelid: 0,
+                cataract: 0
+            };
+
+            const eyes = [analysis?.left_eye, analysis?.right_eye].filter(Boolean);
+            for (const eye of eyes) {
+                const disease = String(eye.disease || '');
+                const conf = readConfidencePercent(eye.confidence);
+
+                if (disease.includes('일반') || disease.includes('Normal')) {
+                    scores.normal = Math.max(scores.normal, conf);
+                } else if (disease.includes('결막염') || disease.includes('Conjunctivitis')) {
+                    scores.conj = Math.max(scores.conj, conf);
+                } else if (disease.includes('포도막염') || disease.includes('Uveitis')) {
+                    scores.uveitis = Math.max(scores.uveitis, conf);
+                } else if (disease.includes('다래끼') || disease.includes('Eyelid')) {
+                    scores.eyelid = Math.max(scores.eyelid, conf);
+                } else if (disease.includes('백내장') || disease.includes('Cataract')) {
+                    scores.cataract = Math.max(scores.cataract, conf);
+                }
+            }
+
+            return scores;
+        }
+
+        function getRednessLevel(redness) {
+            const value = Number(redness || 0);
+            if (value < 0.08) return { text: '정상', className: 'red-level-normal' };
+            if (value < 0.14) return { text: '경미', className: 'red-level-mild' };
+            if (value < 0.22) return { text: '심함', className: 'red-level-severe' };
+            return { text: '매우심함', className: 'red-level-very-severe' };
+        }
+
+        function renderRednessInfo(analysis) {
+            const leftValEl = document.getElementById('redness-left');
+            const rightValEl = document.getElementById('redness-right');
+            const leftLevelEl = document.getElementById('redness-left-level');
+            const rightLevelEl = document.getElementById('redness-right-level');
+
+            const left = readNumber(analysis?.left_eye?.redness);
+            const right = readNumber(analysis?.right_eye?.redness);
+
+            if (left !== null) {
+                const lv = getRednessLevel(left);
+                leftValEl.textContent = left.toFixed(4);
+                leftLevelEl.textContent = `(${lv.text})`;
+                leftLevelEl.className = lv.className;
+            } else {
+                leftValEl.textContent = '-';
+                leftLevelEl.textContent = '';
+                leftLevelEl.className = '';
+            }
+
+            if (right !== null) {
+                const lv = getRednessLevel(right);
+                rightValEl.textContent = right.toFixed(4);
+                rightLevelEl.textContent = `(${lv.text})`;
+                rightLevelEl.className = lv.className;
+            } else {
+                rightValEl.textContent = '-';
+                rightLevelEl.textContent = '';
+                rightLevelEl.className = '';
+            }
+        }
+
+        function renderAiResults() {
+            const normalEl = document.getElementById('ai-normal');
+            const conjEl = document.getElementById('ai-conj');
+            const uveitisEl = document.getElementById('ai-uveitis');
+            const eyelidEl = document.getElementById('ai-eyelid');
+            const cataractEl = document.getElementById('ai-cataract');
+
+            const analysis = getStoredAnalysis();
+            if (!analysis.left_eye && !analysis.right_eye) {
+                setStatusTag(normalEl, 'tag-warning', '분석 데이터 없음');
+                setStatusTag(conjEl, 'tag-warning', '분석 데이터 없음');
+                setStatusTag(uveitisEl, 'tag-warning', '분석 데이터 없음');
+                setStatusTag(eyelidEl, 'tag-warning', '분석 데이터 없음');
+                setStatusTag(cataractEl, 'tag-warning', '분석 데이터 없음');
+                updateEyeViewButtons(analysis);
+                setActiveEyeViewButton(eyeViewMode);
+                updateCamToggleState(analysis);
+                renderSelectedEyeImageForMode(analysis);
+                return;
+            }
+
+            renderRednessInfo(analysis);
+            updateEyeViewButtons(analysis);
+            setActiveEyeViewButton(eyeViewMode);
+            updateCamToggleState(analysis);
+            renderSelectedEyeImageForMode(analysis);
+
+            const scores = extractDiseaseScores(analysis);
+            setStatusTag(normalEl, confidenceToNormalLevel(scores.normal), formatNormalText(scores.normal));
+            setStatusTag(conjEl, confidenceToLevel(scores.conj), formatResultText(scores.conj));
+            setStatusTag(uveitisEl, confidenceToLevel(scores.uveitis), formatResultText(scores.uveitis));
+            setStatusTag(eyelidEl, confidenceToLevel(scores.eyelid), formatResultText(scores.eyelid));
+            setStatusTag(cataractEl, confidenceToLevel(scores.cataract), formatResultText(scores.cataract));
+            refreshReportAvailability();
+        }
+
+        // 1. 이미지 표시 로직 (capture 원본 1장 고정)
+        function renderCapturedPhoto() {
+            const photo = getPhotoDataUrl();
+            const imageEl = document.getElementById('captured-image');
+            const hintEl = document.getElementById('captured-empty-hint');
+            if (!imageEl) return;
+            if (photo) {
+                eyeViewMode = 'ORIGINAL';
+                eyeCropCache = { L: '', R: '' };
+                imageEl.onload = () => renderGradCamOverlay(getStoredAnalysis());
+                imageEl.src = photo;
+                if (hintEl) hintEl.style.display = 'none';
+                setActiveEyeViewButton('ORIGINAL');
+            } else {
+                imageEl.removeAttribute('src');
+                if (hintEl) hintEl.style.display = 'block';
+                eyeCropCache = { L: '', R: '' };
+                setActiveEyeViewButton('ORIGINAL');
+                renderGradCamOverlay({});
+            }
+        }
+
+        // 2. 재촬영 로직
+        async function retakePhotos() {
+            const ok = await showConfirm("현재 화면의 임시 촬영/분석 데이터만 초기화하고 다시 촬영하시겠습니까?\n이미 저장된 DB 이력과 기존 리포트 기록은 삭제되지 않습니다.", '재촬영');
+            if (ok) {
+                removeSessionValue('eye_photo_L');
+                removeSessionValue('eye_photo_R');
+                removeSessionValue('eye_analysis_L');
+                removeSessionValue('eye_analysis_R');
+                removeSessionValue('bilateral_capture');
+                removeSessionValue('bilateral_analysis');
+                removeSessionValue('data_updated');
+                window.location.href = '/capture';
+            }
+        }
+
+        // 3. 최신 데이터 상태 확인
+        async function updateData() {
+            refreshReportAvailability();
+
+            if (isLatestDataReady()) {
+                writeSessionValue('data_updated', 'true');
+                await showAlert("최신 분석 데이터가 확인되었습니다. 바로 리포트를 발행할 수 있습니다.");
+            } else {
+                writeSessionValue('data_updated', 'false');
+                await showAlert("아직 최신 분석 데이터가 없습니다. 좌/우 눈 분석을 먼저 완료해 주세요.");
+            }
+        }
+
+        // 4. 리포트 발행 및 페이지 이동 (report.html 연결)
+        async function generateReport() {
+            if (isLatestDataReady()) {
+                writeSessionValue('data_updated', 'true');
+                window.location.href = '/report';
+            } else {
+                writeSessionValue('data_updated', 'false');
+                refreshReportAvailability();
+                await showAlert("리포트 발행에 필요한 최신 분석 데이터가 없습니다.");
+            }
+        }
+
+        window.onload = () => {
+            renderCapturedPhoto();
+            renderAiResults();
+            writeSessionValue('data_updated', isLatestDataReady() ? 'true' : 'false');
+            refreshReportAvailability();
+            toggleGradCam(false);
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeNearbyClinicMap();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                renderSelectedEyeImageForMode(getStoredAnalysis());
+            });
+        };
+    </script>
+</body>
+<script>
+    (function () {
+        const root = document.documentElement;
+        function currentTheme() {
+            const t = root.getAttribute('data-theme');
+            return (t === 'dark' || t === 'light') ? t : 'light';
+        }
+        function applyTheme(theme, persist) {
+            root.setAttribute('data-theme', theme);
+            if (persist) {
+                try { localStorage.setItem('theme', theme); } catch (e) {}
+            }
+            const btn = document.getElementById('global-theme-toggle');
+            if (!btn) return;
+            const icon = btn.querySelector('[data-role="icon"]');
+            const label = btn.querySelector('[data-role="label"]');
+            if (theme === 'dark') {
+                if (icon) icon.textContent = '☀️';
+                if (label) label.textContent = '라이트 모드';
+            } else {
+                if (icon) icon.textContent = '🌙';
+                if (label) label.textContent = '다크 모드';
+            }
+        }
+        applyTheme(currentTheme(), false);
+    })();
+</script>
+</html>

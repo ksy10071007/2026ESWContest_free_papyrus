@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안구 촬영 - AI 안구 건강 스크리닝</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <!-- i18n Global Support -->
+    <link rel="stylesheet" href="/static/css/i18n-common.css">
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <!-- Global language FAB intentionally not included on this page -->
+    <style>
+        :root { 
+            --primary: #007AFF; 
+            --bg: #f5f5f7; 
+            --card: #ffffff; 
+            --text: #1d1d1f; 
+            --border: #d2d2d7; 
+            --guide-color: rgba(40, 205, 65, 0.6); /* 연한 녹색 가이드 */
+            --safe-top: env(safe-area-inset-top, 0);
+            --safe-bottom: env(safe-area-inset-bottom, 0);
+            --safe-left: env(safe-area-inset-left, 0);
+            --safe-right: env(safe-area-inset-right, 0);
+            --fluid-padding: clamp(12px, 3vw, 24px);
+            --fluid-gap: clamp(12px, 2vw, 24px);
+            --fluid-radius: clamp(12px, 3vw, 18px);
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --border: #2a3240;
+            --guide-color: rgba(52, 211, 153, 0.55);
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 4000;
+            display: none;
+        }
+
+        .confirm-toast.show { display: block; }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        [data-theme="dark"] .video-container,
+        [data-theme="dark"] #video-feed { background: #0b1220; }
+        [data-theme="dark"] .camera-bottom-btns { background: #111827; }
+        [data-theme="dark"] .btn-upload,
+        [data-theme="dark"] .btn-restore,
+        [data-theme="dark"] #detection-status { background: #1f2937; color: var(--text); }
+        [data-theme="dark"] .status-message { color: #cbd5e1 !important; }
+        [data-theme="dark"] .confidence-text { color: #94a3b8 !important; }
+
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            display: flex; 
+            width: 1280px; 
+            height: 800px; 
+            overflow: hidden; 
+            padding: 24px;
+            box-sizing: border-box;
+            gap: 24px;
+        }
+
+        /* 왼쪽: 카메라 섹션 */
+        .left-panel { 
+            flex: 1.4; 
+            display: flex; 
+            flex-direction: column; 
+            background: var(--card); 
+            position: relative; 
+            overflow: hidden;
+            border-radius: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .video-container {
+            width: 100%;
+            height: 82%;
+            position: relative;
+            overflow: hidden;
+            background: #222;
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+        }
+
+        .video-container.mobile-upload-tappable {
+            cursor: pointer;
+        }
+
+        #video-feed { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            transform: scaleX(-1); 
+            background: #222; 
+            transform-origin: center center;
+            display: block;
+        }
+
+        .mobile-preview-hint {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 10px;
+            padding: 12px 14px;
+            width: min(86%, 360px);
+            line-height: 1.5;
+            display: none;
+            pointer-events: none;
+        }
+
+        .mobile-preview-hint.hint-pulse {
+            animation: hintPulse 1.2s ease-in-out 3;
+        }
+
+        @keyframes hintPulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+            50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+        }
+
+        .upload-progress-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.62);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 8;
+        }
+
+        .upload-progress-card {
+            background: rgba(15, 23, 42, 0.88);
+            color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 12px;
+            padding: 12px 14px;
+            width: min(86%, 320px);
+            text-align: center;
+        }
+
+        .upload-progress-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .upload-progress-sub {
+            font-size: 0.82rem;
+            color: #cbd5e1;
+        }
+
+        .mobile-reupload-fab {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            z-index: 9;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+            border-radius: 999px;
+            min-height: 42px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: none;
+        }
+
+        .btn-use-last {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            background: #eef2ff;
+            color: #334155;
+            border: 1px dashed var(--border);
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            display: none;
+        }
+
+
+        /* 하단 및 우측 패널 스타일 유지 */
+        .camera-bottom-btns { height: 18%; background: #ffffff; display: flex; align-items: center; justify-content: center; gap: 20px; border-top: 1px solid var(--border); padding: 0 20px; box-sizing: border-box; }
+        .right-panel { flex: 1; padding: 30px; display: flex; flex-direction: column; justify-content: flex-start; background: var(--card); border-radius: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-y: auto; box-sizing: border-box; }
+        .card { background: var(--card); padding: 25px; border-radius: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .btn-capture { width: 100%; padding: 25px; border-radius: 15px; background: var(--primary); color: white; font-weight: 800; border: none; font-size: 1.3rem; cursor: pointer; display: none; }
+        .btn-upload { width: 100%; padding: 16px; border-radius: 12px; background: var(--primary); color: white; font-weight: 700; border: none; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+        .btn-restore { width: 100%; padding: 14px; border-radius: 12px; background: #f8fafc; color: #475569; font-weight: 700; border: 1px solid var(--border); font-size: 0.95rem; cursor: pointer; margin-top: 8px; }
+        .btn-go-result { width: 100%; padding: 18px; border-radius: 12px; background: #16a34a; color: #fff; font-weight: 800; border: none; font-size: 1.05rem; cursor: pointer; margin-top: 10px; }
+        .btn-go-result:disabled { background: #cbd5e1; color: #64748b; cursor: not-allowed; }
+        .eye-select-wrap { display:flex; gap:10px; }
+        .btn-eye { flex:1; padding:14px; border:1px solid var(--border); border-radius:10px; background:#fff; font-weight:700; cursor:pointer; }
+        .btn-eye.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+        .thumb-wrap { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+        .thumb-box { border:1px solid var(--border); border-radius:10px; padding:8px; background:#f8fafc; cursor:pointer; }
+        .thumb-title { font-size:0.8rem; color:#64748b; margin-bottom:6px; font-weight:700; }
+        .thumb-img { width:100%; height:70px; object-fit:cover; border-radius:8px; background:#e2e8f0; }
+
+        .detection-status-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .status-message {
+            font-size: 0.95rem;
+            color: #64748b;
+        }
+
+        .confidence-text {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        /* 유동적 반응형 스타일 */
+        @media screen and (max-width: 480px) {
+            body {
+                padding: clamp(8px, 3vw, 12px);
+                gap: clamp(8px, 2vw, 12px);
+            }
+
+            .video-container {
+                height: clamp(200px, 40dvh, 300px);
+            }
+
+            .card {
+                padding: clamp(10px, 4vw, 14px);
+                margin-bottom: clamp(8px, 2vw, 12px);
+            }
+
+            .btn-capture {
+                font-size: clamp(0.95rem, 4vw, 1.08rem);
+                padding: clamp(10px, 3vw, 14px);
+            }
+
+            .camera-bottom-btns {
+                padding: clamp(8px, 2vw, 10px) clamp(10px, 3vw, 12px);
+                gap: clamp(6px, 2vw, 8px);
+            }
+
+            .right-panel {
+                padding: clamp(10px, 4vw, 14px);
+            }
+
+            #camera-guide-text {
+                font-size: clamp(0.8rem, 2.5vw, 0.9rem) !important;
+            }
+
+            .thumb-wrap {
+                gap: clamp(8px, 2vw, 10px);
+            }
+        }
+
+        @media screen and (min-width: 481px) and (max-width: 768px) {
+            body {
+                padding: clamp(12px, 2vw, 16px);
+                gap: clamp(12px, 1.5vw, 16px);
+            }
+
+            .video-container {
+                height: clamp(240px, 45dvh, 360px);
+            }
+
+            .card {
+                padding: clamp(12px, 3vw, 18px);
+                margin-bottom: clamp(10px, 1.5vw, 16px);
+            }
+
+            .btn-capture {
+                font-size: clamp(1rem, 3vw, 1.1rem);
+                padding: clamp(12px, 2.5vw, 16px);
+            }
+        }
+
+        @media screen and (min-width: 769px) and (max-width: 1024px) {
+            body {
+                width: auto;
+                height: auto;
+                min-height: 100dvh;
+                flex-direction: column;
+                overflow-y: auto;
+                padding: clamp(16px, 2vw, 24px);
+                gap: clamp(16px, 1.5vw, 24px);
+            }
+
+            .left-panel {
+                width: 100%;
+                min-height: 400px;
+            }
+
+            .right-panel {
+                width: 100%;
+            }
+
+            .video-container {
+                height: clamp(300px, 50dvh, 450px);
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            body {
+                min-height: 100dvh;
+                height: 100dvh;
+                padding: clamp(8px, 1vw, 12px);
+                gap: clamp(8px, 1vw, 12px);
+            }
+
+            .left-panel {
+                min-height: auto;
+                height: auto;
+            }
+
+            .video-container {
+                height: clamp(150px, 70dvh, 350px);
+            }
+
+            .camera-bottom-btns {
+                height: auto;
+                padding: clamp(6px, 1vw, 10px);
+                gap: clamp(6px, 1vw, 10px);
+            }
+
+            .right-panel {
+                max-height: 30dvh;
+                overflow-y: auto;
+                padding: clamp(8px, 1vw, 12px);
+            }
+
+            .card {
+                padding: clamp(8px, 1.5vw, 12px);
+                margin-bottom: clamp(6px, 1vw, 10px);
+            }
+
+            .btn-capture {
+                padding: clamp(10px, 1.5vw, 14px);
+                font-size: clamp(0.9rem, 2vw, 1rem);
+            }
+
+            .thumb-wrap {
+                grid-template-columns: 1fr 1fr;
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+        }
+
+        @media (orientation: portrait) and (min-height: 900px) {
+            .video-container {
+                height: clamp(300px, 45dvh, 500px);
+            }
+
+            .right-panel {
+                height: auto;
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                padding: 12px;
+                gap: 12px;
+                overflow-x: hidden;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .left-panel,
+            .right-panel {
+                width: 100%;
+                flex: none;
+            }
+
+            .left-panel {
+                min-height: 240px;
+            }
+
+            .video-container {
+                height: clamp(220px, 42vh, 340px);
+                min-height: 220px;
+            }
+
+            .camera-bottom-btns {
+                height: auto;
+                padding: 10px 12px;
+                align-items: flex-start;
+                justify-content: flex-start;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .right-panel {
+                padding: 14px;
+            }
+
+            .card {
+                padding: 14px;
+                margin-bottom: 12px;
+            }
+
+            .thumb-wrap {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-capture,
+            .btn-upload,
+            .btn-restore,
+            .btn-go-result,
+            .btn-eye {
+                min-height: 48px;
+                box-sizing: border-box;
+            }
+
+            .btn-capture {
+                padding: 14px;
+                font-size: 1.08rem;
+            }
+
+            body.mobile-upload-only {
+                padding: 10px;
+                gap: 10px;
+                padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            }
+
+            body.mobile-upload-only .left-panel {
+                min-height: 50vh;
+                border-radius: 14px;
+                flex: 1;
+            }
+
+            body.mobile-upload-only .video-container {
+                height: 50vh;
+                min-height: 240px;
+                max-height: 65vh;
+                border-radius: 14px;
+            }
+
+            body.mobile-upload-only .right-panel {
+                padding: 12px;
+                border-radius: 14px;
+                padding-bottom: calc(12px + env(safe-area-inset-bottom));
+                flex: 1;
+            }
+
+            body.mobile-upload-only .right-panel .card {
+                margin-bottom: 10px;
+                padding: 12px;
+            }
+
+            body.mobile-upload-only .btn-upload,
+            body.mobile-upload-only .btn-go-result {
+                margin-top: 8px;
+            }
+
+            body.mobile-upload-only #capture-message {
+                font-size: 0.86rem;
+                line-height: 1.45;
+            }
+
+            body.mobile-upload-only .mobile-preview-hint {
+                display: block;
+                font-size: 0.9rem;
+                width: min(90%, 360px);
+            }
+
+            body.mobile-upload-only .theme-toggle-floating {
+                display: none;
+            }
+
+            body.mobile-upload-only .mobile-reupload-fab.show {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            body.mobile-upload-only .btn-use-last.show {
+                display: block;
+            }
+
+            body.mobile-upload-only #video-feed {
+                object-fit: contain;
+                transform: none;
+            }
+
+        }
+
+        /* 추가 유동적 반응형 스타일 - 안전 영역 및 Notch 지원 */
+        @media screen and (max-width: 768px) {
+            body {
+                padding-top: max(var(--safe-top), clamp(8px, 2vw, 12px));
+                padding-bottom: max(var(--safe-bottom), clamp(8px, 2vw, 12px));
+                padding-left: max(var(--safe-left), clamp(8px, 2vw, 12px));
+                padding-right: max(var(--safe-right), clamp(8px, 2vw, 12px));
+            }
+
+            .left-panel,
+            .right-panel {
+                border-radius: var(--fluid-radius);
+            }
+
+            .card,
+            .btn-capture,
+            .btn-upload,
+            .btn-restore {
+                border-radius: var(--fluid-radius);
+            }
+
+            .video-container {
+                border-radius: var(--fluid-radius);
+            }
+
+            .theme-toggle-floating {
+                top: max(18px, calc(var(--safe-top) + 8px));
+            }
+
+            #confirm-toast {
+                margin-left: max(0, var(--safe-left));
+                margin-right: max(0, var(--safe-right));
+                top: max(24px, calc(var(--safe-top) + 16px));
+            }
+
+            .mobile-reupload-fab {
+                right: max(12px, calc(12px + var(--safe-right)));
+                bottom: max(12px, calc(12px + var(--safe-bottom)));
+            }
+        }
+
+        /* 극소형 화면 (280px ~ 380px) */
+        @media screen and (max-width: 380px) {
+            body {
+                padding: clamp(6px, 2vw, 10px);
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+
+            .card {
+                padding: clamp(8px, 3vw, 12px);
+            }
+
+            .video-container {
+                height: clamp(180px, 35dvh, 260px);
+            }
+
+            .left-panel {
+                min-height: auto;
+            }
+
+            .camera-bottom-btns {
+                padding: clamp(6px, 1.5vw, 8px);
+            }
+
+            .right-panel {
+                padding: clamp(8px, 3vw, 10px);
+            }
+
+            #camera-guide-text {
+                font-size: clamp(0.75rem, 2.2vw, 0.85rem) !important;
+            }
+
+            .btn-capture {
+                font-size: clamp(0.9rem, 3.5vw, 1rem);
+                padding: clamp(10px, 2.5vw, 12px);
+            }
+
+            .btn-eye {
+                padding: clamp(10px, 2vw, 12px);
+                font-size: clamp(0.8rem, 2vw, 0.9rem);
+            }
+
+            h2 {
+                font-size: clamp(1rem, 3vw, 1.15rem) !important;
+            }
+        }
+
+        /* 매우 큰 모바일/작은 태블릿 (768px ~ 900px) */
+        @media screen and (min-width: 769px) and (max-height: 600px) {
+            .video-container {
+                height: clamp(150px, 65dvh, 400px);
+            }
+
+            .right-panel {
+                max-height: 35dvh;
+                overflow-y: auto;
+            }
+        }
+
+        /* 고해상도 모바일 (4K 가로 모드) */
+        @media screen and (min-width: 1440px) and (orientation: landscape) {
+            body {
+                flex-direction: row;
+                width: auto;
+                height: 100dvh;
+                gap: clamp(14px, 1.5vw, 24px);
+            }
+
+            .left-panel {
+                flex: 1.2;
+            }
+
+            .right-panel {
+                flex: 1;
+            }
+
+            .video-container {
+                height: calc(100dvh - 80px);
+            }
+
+            .camera-bottom-btns {
+                height: auto;
+            }
+        }
+
+        /* 프린트 미디어 (인쇄 최적화) */
+        @media print {
+            body,
+            .left-panel,
+            .right-panel,
+            .video-container {
+                box-shadow: none;
+                background: white;
+            }
+        }
+
+        /* 어두운 색상 모드 강제 (다크 모드 장치) */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --primary: #4ea1ff;
+                --bg: #0f1115;
+                --card: #161a22;
+                --text: #e5e7eb;
+                --border: #2a3240;
+            }
+        }
+
+        /* 높은 명도 대비 선호 (접근성) */
+        @media (prefers-contrast: more) {
+            body {
+                --primary: #0051d5;
+                --text: #000;
+                --border: #333;
+            }
+
+            [data-theme="dark"] {
+                --primary: #66b3ff;
+                --text: #fff;
+                --border: #999;
+            }
+
+            .btn-capture {
+                font-weight: 900;
+            }
+        }
+
+        /* 감소 모션 선호 (접근성) */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            @keyframes hintPulse {
+                0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            }
+        }
+
+        /* 터치 기기 최적화 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-capture,
+            .btn-upload,
+            .btn-restore,
+            .btn-go-result,
+            .btn-eye,
+            button {
+                min-height: clamp(44px, 10vw, 52px);
+                padding: clamp(12px, 3vw, 18px);
+            }
+
+            input[type="range"],
+            input[type="checkbox"] {
+                width: clamp(18px, 5vw, 24px);
+                height: clamp(18px, 5vw, 24px);
+            }
+
+            .thumb-box {
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+            }
+
+            .thumb-box:active {
+                background: var(--primary);
+                opacity: 0.7;
+            }
+        }
+
+        /* 마우스 호버 가능 기기 */
+        @media (hover: hover) and (pointer: fine) {
+            .btn-capture,
+            .btn-upload,
+            .btn-restore,
+            .btn-go-result,
+            button {
+                transition: all 0.2s ease;
+            }
+
+            .btn-capture:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            }
+
+            .thumb-box:hover {
+                background: var(--primary);
+                opacity: 0.15;
+            }
+        }
+
+        /* 동적 뷰포트 폭 대응 (콘텐츠 중심) */
+        @supports (width: 100dvw) {
+            @media screen and (max-width: 768px) {
+                body {
+                    width: 100dvw;
+                    min-height: 100dvh;
+                }
+            }
+        }
+
+        /* ============================================
+           유동적 유틸리티 클래스
+           ============================================ */
+        
+        /* 반응형 마진/패딩 */
+        .fluid-padding { padding: var(--fluid-padding); }
+        .fluid-gap { gap: var(--fluid-gap); }
+        .fluid-radius { border-radius: var(--fluid-radius); }
+
+        /* 화면 크기별 표시/숨김 */
+        .hide-on-mobile { display: block; }
+        .show-only-mobile { display: none; }
+
+        @media screen and (max-width: 768px) {
+            .hide-on-mobile { display: none !important; }
+            .show-only-mobile { display: block !important; }
+        }
+
+        .hide-on-tablet { display: block; }
+        .show-only-tablet { display: none; }
+
+        @media screen and (min-width: 769px) and (max-width: 1024px) {
+            .hide-on-tablet { display: none !important; }
+            .show-only-tablet { display: block !important; }
+        }
+
+        .hide-on-landscape { display: block; }
+        .show-only-landscape { display: none; }
+
+        @media (orientation: landscape) {
+            .hide-on-landscape { display: none !important; }
+            .show-only-landscape { display: block !important; }
+        }
+
+        .hide-on-portrait { display: block; }
+        .show-only-portrait { display: none; }
+
+        @media (orientation: portrait) {
+            .hide-on-portrait { display: none !important; }
+            .show-only-portrait { display: block !important; }
+        }
+
+        /* 유동적 폰트 크기 */
+        .text-fluid-sm { font-size: clamp(0.75rem, 2vw, 0.875rem); }
+        .text-fluid-base { font-size: clamp(0.875rem, 2.5vw, 1rem); }
+        .text-fluid-lg { font-size: clamp(1rem, 3vw, 1.2rem); }
+        .text-fluid-xl { font-size: clamp(1.1rem, 3.5vw, 1.5rem); }
+        .text-fluid-2xl { font-size: clamp(1.25rem, 4.5vw, 1.875rem); }
+
+        /* 유동적 여백 */
+        .space-fluid-xs { margin: clamp(4px, 1vw, 8px); }
+        .space-fluid-sm { margin: clamp(8px, 2vw, 12px); }
+        .space-fluid-md { margin: clamp(12px, 3vw, 16px); }
+        .space-fluid-lg { margin: clamp(16px, 4vw, 24px); }
+
+        /* 유동적 높이 */
+        .h-fluid-sm { height: clamp(100px, 25dvh, 200px); }
+        .h-fluid-md { height: clamp(200px, 40dvh, 400px); }
+        .h-fluid-lg { height: clamp(300px, 60dvh, 600px); }
+
+        /* 안전 영역 패딩 */
+        .with-safe-area {
+            padding-top: max(12px, var(--safe-top));
+            padding-bottom: max(12px, var(--safe-bottom));
+            padding-left: max(12px, var(--safe-left));
+            padding-right: max(12px, var(--safe-right));
+        }
+
+        /* Notch 및 Dynamic Island 대응 */
+        @supports (padding: max(0px)) {
+            .notch-safe-top { padding-top: max(12px, var(--safe-top)); }
+            .notch-safe-bottom { padding-bottom: max(12px, var(--safe-bottom)); }
+        }
+
+        /* 스크롤 최적화 */
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .scroll-smooth {
+                scroll-behavior: auto;
+            }
+        }
+
+        /* 터치 스크롤 영역 최적화 */
+        .touch-scroll {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+        }
+
+        /* 입력 필드 자동 줌 방지 */
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="range"],
+        textarea,
+        select {
+            font-size: 16px;
+        }
+
+        /* 모바일 기기에서 입력 필드 줌 방지 */
+        @media screen and (max-width: 768px) {
+            input,
+            textarea,
+            select {
+                font-size: 16px !important;
+            }
+        }
+
+        /* 플렉스 유동적 그리드 */
+        .flex-fluid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--fluid-gap);
+        }
+
+        .grid-fluid {
+            display: grid;
+            gap: var(--fluid-gap);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+        }
+
+        @media screen and (max-width: 480px) {
+            .grid-fluid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 비율 유지 컨테이너 (16:9) */
+        .aspect-16-9 {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%;
+        }
+
+        .aspect-16-9 > * {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 비율 유지 컨테이너 (4:3) */
+        .aspect-4-3 {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 75%;
+        }
+
+        .aspect-4-3 > * {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 컨테이너 쿼리 지원 (선택적) */
+        @supports (container-type: inline-size) {
+            .container-responsive {
+                container-type: inline-size;
+            }
+
+            @container (max-width: 400px) {
+                .container-responsive h2 {
+                    font-size: clamp(1rem, 5cqw, 1.2rem);
+                }
+            }
+        }
+
+        /* 시각적 피드백 (터치) */
+        button:active,
+        .interactive:active {
+            transform: scale(0.98);
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            button,
+            .interactive {
+                transition: transform 0.15s ease, opacity 0.15s ease;
+            }
+        }
+
+        /* 키보드 네비게이션 표시기 */
+        .keyboard-nav *:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* 네이티브 풀리시 */
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        /* 선택 강조 색상 */
+        ::selection {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* 포커스 가시성 개선 */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* 레이아웃 이동 최소화 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+
+    <div class="left-panel">
+        <div class="video-container">
+            <img id="video-feed" src="">
+            <div id="mobile-preview-hint" class="mobile-preview-hint"><span data-i18n="mobile_preview_hint">📱 여기에 업로드한 얼굴 사진이 표시됩니다.<br>우측의 "얼굴 사진 업로드" 버튼으로 사진을 선택해 주세요.</span></div>
+            <div id="upload-progress-overlay" class="upload-progress-overlay" aria-live="polite">
+                <div class="upload-progress-card">
+                    <div id="upload-progress-title" class="upload-progress-title">이미지 준비 중...</div>
+                    <div id="upload-progress-sub" class="upload-progress-sub">잠시만 기다려 주세요.</div>
+                </div>
+            </div>
+            <button id="btn-mobile-reupload" class="mobile-reupload-fab" onclick="openImageUploader()">다시 업로드</button>
+        </div>
+
+        <div class="camera-bottom-btns" style="display: none;">
+            <div id="camera-guide-text" style="font-size: 0.9rem; color: #64748b;">
+                <span data-i18n="capture_eye_align_hint">※ 고해상도 촬영을 위해 가이드 중앙에 눈을 정렬해 주세요.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div id="step0-card" class="card" style="display: none;">
+            <h2 style="margin:0 0 15px 0; font-size: 1.2rem; color: var(--primary);" data-i18n="capture_step0">Step 0. 눈 감지 상태</h2>
+            <div id="detection-status" class="detection-status-box">
+                <div id="status-dot" style="width: 12px; height: 12px; border-radius: 50%; background: #ccc;"></div>
+                <div>
+                    <div id="status-message" class="status-message" data-i18n="status_camera_connecting">카메라 연결 중...</div>
+                    <div id="confidence-text" class="confidence-text"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="step2-card" class="card">
+            <h2 style="margin:0 0 15px 0; font-size: 1.2rem; color: var(--primary);" data-i18n="capture_step2">Step 1. 얼굴 사진 등록</h2>
+            <button class="btn-upload" onclick="openImageUploader()" data-i18n="btn_upload_photo">🖼️ 얼굴 사진 업로드</button>
+            <button id="btn-capture-photo" class="btn-capture" onclick="takeSnapshot()" data-i18n="btn_capture_photo">📸 얼굴 전체 촬영</button>
+            <button id="btn-use-last-upload" class="btn-use-last" onclick="useLastUploadedImage()" data-i18n="btn_use_last_upload">↺ 최근 업로드 다시 사용</button>
+            <button class="btn-restore" onclick="restoreCameraPreview()" data-i18n="btn_restore_camera" style="display: none;">↩️ 실시간 카메라로 복귀</button>
+            <button id="btn-go-result" class="btn-go-result" onclick="goToResult()" disabled data-i18n="btn_view_result">✅ 결과 보기</button>
+            <input id="upload-image-input" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleUploadedImage(event)">
+            <div id="capture-message" style="margin-top:10px; font-size:0.9rem; color:#64748b;" data-i18n="capture_guidance">안내: 얼굴 사진 한 장을 업로드하면 분석 후 결과를 확인할 수 있습니다.</div>
+        </div>
+
+    </div>
+
+    <div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+        <div id="confirm-toast-message" class="confirm-toast-message"></div>
+        <div class="confirm-toast-actions">
+            <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel" style="display:none;">취소</button>
+            <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">확인</button>
+        </div>
+    </div>
+
+    <script>
+        let capturedPhoto = null;
+        let analysisReady = false;
+        let detectionPollingInterval = null;
+        let digitalZoom = 1.0;
+        let autoShutterEnabled = true;
+        let isCapturing = false;
+        let autoCooldownUntil = 0;
+        let previewMode = 'camera'; // 'camera' | 'upload'
+        let mobileUploadOnlyMode = false;
+        let captureCameraSessionActive = false;
+        let videoFallbackInterval = null;
+        const AUTO_SHUTTER_CONF_THRESHOLD = 0.70; // 70%
+        const LAST_UPLOAD_KEY = 'last_mobile_upload_capture';
+        const MOBILE_HINT_SEEN_KEY = 'mobile_upload_hint_seen_v1';
+
+        function readSessionValue(key) {
+            const current = sessionStorage.getItem(key);
+            if (current !== null) return current;
+
+            const legacy = localStorage.getItem(key);
+            if (legacy !== null) {
+                sessionStorage.setItem(key, legacy);
+                localStorage.removeItem(key);
+            }
+            return legacy;
+        }
+
+        function writeSessionValue(key, value) {
+            sessionStorage.setItem(key, value);
+            if (key === 'user_id' || key === 'data_updated' || key.startsWith('eye_analysis_') || key.startsWith('bilateral_')) {
+                localStorage.setItem(key, value);
+            }
+        }
+
+        function removeSessionValue(key) {
+            sessionStorage.removeItem(key);
+            localStorage.removeItem(key);
+        }
+
+        function isMobileClient() {
+            const ua = navigator.userAgent || '';
+            const maybeMobileUA = /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(ua);
+            const narrowViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 768;
+            return maybeMobileUA && narrowViewport;
+        }
+
+        function canUseMobileCameraDirectly() {
+            return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.isSecureContext);
+        }
+
+        function enableMobileUploadOnlyMode() {
+            mobileUploadOnlyMode = true;
+            autoShutterEnabled = false;
+
+            const bodyEl = document.body;
+            const step0Card = document.getElementById('step0-card');
+            const step2Card = document.getElementById('step2-card');
+            const cameraBottom = document.querySelector('.camera-bottom-btns');
+            const captureBtn = document.getElementById('btn-capture-photo');
+            const restoreBtn = document.querySelector('.btn-restore');
+            const autoToggle = document.getElementById('auto-shutter-toggle');
+            const statusEl = document.getElementById('auto-shutter-status');
+            const messageEl = document.getElementById('capture-message');
+            const videoImg = document.getElementById('video-feed');
+            const videoContainer = document.querySelector('.video-container');
+            const previewHint = document.getElementById('mobile-preview-hint');
+            const guideText = document.getElementById('camera-guide-text');
+            const bottomBar = document.querySelector('.camera-bottom-btns');
+            const useLastBtn = document.getElementById('btn-use-last-upload');
+            const reuploadFab = document.getElementById('btn-mobile-reupload');
+
+            if (bodyEl) bodyEl.classList.add('mobile-upload-only');
+            if (step0Card) step0Card.style.display = 'none';
+            if (cameraBottom) cameraBottom.style.display = 'none';
+            if (captureBtn) captureBtn.style.display = 'none';
+            if (restoreBtn) restoreBtn.style.display = 'none';
+            if (autoToggle) autoToggle.checked = false;
+            if (statusEl) statusEl.textContent = '모바일 업로드 모드';
+
+            previewMode = 'upload';
+            if (videoImg) {
+                videoImg.removeAttribute('src');
+                videoImg.style.background = '#0f172a';
+                videoImg.style.objectFit = 'contain';
+                videoImg.style.transform = 'none';
+            }
+            if (videoContainer) {
+                videoContainer.classList.add('mobile-upload-tappable');
+                if (!videoContainer.dataset.uploadTapBound) {
+                    videoContainer.addEventListener('click', () => {
+                        if (mobileUploadOnlyMode) openImageUploader();
+                    });
+                    videoContainer.dataset.uploadTapBound = '1';
+                }
+            }
+            if (previewHint) previewHint.style.display = 'block';
+            if (previewHint && !localStorage.getItem(MOBILE_HINT_SEEN_KEY)) {
+                previewHint.classList.add('hint-pulse');
+                localStorage.setItem(MOBILE_HINT_SEEN_KEY, '1');
+            }
+            if (guideText) guideText.textContent = '※ 모바일에서는 웹캠 대신 업로드한 이미지가 이 영역에 표시됩니다.';
+            if (bottomBar) {
+                bottomBar.style.justifyContent = 'center';
+                bottomBar.style.alignItems = 'center';
+            }
+            if (useLastBtn && localStorage.getItem(LAST_UPLOAD_KEY)) {
+                useLastBtn.classList.add('show');
+            }
+
+            if (messageEl) {
+                messageEl.textContent = '모바일 환경에서는 업로드 전용으로 동작합니다. 위 미리보기 영역을 탭하거나 업로드 버튼으로 얼굴 사진을 등록해 주세요.';
+            }
+            if (reuploadFab) {
+                reuploadFab.classList.remove('show');
+            }
+        }
+
+        function setUploadProgress(show, title = '처리 중...', sub = '잠시만 기다려 주세요.') {
+            const overlay = document.getElementById('upload-progress-overlay');
+            const titleEl = document.getElementById('upload-progress-title');
+            const subEl = document.getElementById('upload-progress-sub');
+            if (!overlay || !titleEl || !subEl) return;
+            titleEl.textContent = title;
+            subEl.textContent = sub;
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        function setLastUploadAvailability() {
+            const useLastBtn = document.getElementById('btn-use-last-upload');
+            if (!useLastBtn) return;
+            if (mobileUploadOnlyMode && localStorage.getItem(LAST_UPLOAD_KEY)) {
+                useLastBtn.classList.add('show');
+            } else {
+                useLastBtn.classList.remove('show');
+            }
+        }
+
+        async function startCaptureCameraSession() {
+            if (mobileUploadOnlyMode) {
+                return true;
+            }
+
+            if (captureCameraSessionActive) {
+                return true;
+            }
+
+            try {
+                const response = await fetch('/camera/session/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'capture_page' })
+                });
+                if (!response.ok) {
+                    throw new Error(`camera-session-start-failed:${response.status}`);
+                }
+
+                const data = await response.json();
+                captureCameraSessionActive = data.status === 'ok';
+                return captureCameraSessionActive;
+            } catch (error) {
+                console.error('[Camera Session Start Error]', error);
+                captureCameraSessionActive = false;
+                return false;
+            }
+        }
+
+        function stopCaptureCameraSession() {
+            if (!captureCameraSessionActive || mobileUploadOnlyMode) {
+                return;
+            }
+
+            captureCameraSessionActive = false;
+            const payload = JSON.stringify({ source: 'capture_page' });
+
+            try {
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([payload], { type: 'application/json' });
+                    navigator.sendBeacon('/camera/session/stop', blob);
+                    return;
+                }
+            } catch (error) {
+                console.warn('[Camera Session Stop Beacon Error]', error);
+            }
+
+            fetch('/camera/session/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                keepalive: true
+            }).catch((error) => {
+                console.warn('[Camera Session Stop Error]', error);
+            });
+        }
+
+        function stopVideoFallbackPolling() {
+            if (videoFallbackInterval) {
+                clearInterval(videoFallbackInterval);
+                videoFallbackInterval = null;
+            }
+        }
+
+        function startVideoFallbackPolling() {
+            const videoImg = document.getElementById('video-feed');
+            if (!videoImg) return;
+
+            stopVideoFallbackPolling();
+            videoFallbackInterval = setInterval(() => {
+                if (previewMode !== 'camera') return;
+                videoImg.src = `/video_frame?t=${Date.now()}`;
+            }, 250);
+        }
+
+        function showToastPopup(message) {
+            return new Promise((resolve) => {
+                const toast = document.getElementById('confirm-toast');
+                const msgEl = document.getElementById('confirm-toast-message');
+                const okBtn = document.getElementById('confirm-toast-ok');
+                const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+                if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                    window.alert(message);
+                    resolve(true);
+                    return;
+                }
+
+                msgEl.textContent = message;
+                cancelBtn.style.display = 'none';
+                toast.classList.add('show');
+
+                okBtn.onclick = () => {
+                    toast.classList.remove('show');
+                    okBtn.onclick = null;
+                    resolve(true);
+                };
+            });
+        }
+
+        function clearSessionCaptureData() {
+            removeSessionValue('eye_analysis_L');
+            removeSessionValue('eye_analysis_R');
+            removeSessionValue('bilateral_capture');
+            removeSessionValue('bilateral_analysis');
+            removeSessionValue('data_updated');
+        }
+
+        function syncUserScopedCaptureCache() {
+            const currentUserId = (readSessionValue('user_id') || 'anonymous').trim() || 'anonymous';
+            const lastUserId = readSessionValue('active_capture_user_id') || '';
+
+            if (lastUserId && lastUserId !== currentUserId) {
+                clearSessionCaptureData();
+            }
+
+            writeSessionValue('active_capture_user_id', currentUserId);
+        }
+
+        // ==========================================
+        // 눈 감지 상태 폴링 (서버에서 감지 여부 조회)
+        // ==========================================
+        async function pollDetectionStatus() {
+            if (mobileUploadOnlyMode) return;
+            try {
+                const response = await fetch('/detect_status');
+                const data = await response.json();
+                
+                const statusDot = document.getElementById('status-dot');
+                const statusMessage = document.getElementById('status-message');
+                const confidenceText = document.getElementById('confidence-text');
+                
+                if (data.detected) {
+                    statusDot.style.background = '#28cd41';  // 녹색
+                    statusMessage.textContent = data.message;
+                    confidenceText.textContent = `신뢰도: ${(data.confidence * 100).toFixed(1)}%`;
+                } else {
+                    statusDot.style.background = '#b0bec5';  // 회색
+                    statusMessage.textContent = data.message;
+                    confidenceText.textContent = '';
+                }
+
+                handleAutoShutter(data.detected, data.confidence || 0);
+            } catch (error) {
+                console.error('[Detection Status Error]', error);
+            }
+        }
+
+        function toggleAutoShutter() {
+            autoShutterEnabled = document.getElementById('auto-shutter-toggle').checked;
+            const statusEl = document.getElementById('auto-shutter-status');
+            statusEl.textContent = autoShutterEnabled ? '자동셔터 대기 중' : '자동셔터 꺼짐';
+        }
+
+        function setDigitalZoom(value) {
+            digitalZoom = Math.max(1, parseFloat(value) || 1);
+            const videoImg = document.getElementById('video-feed');
+            const zoomValue = document.getElementById('zoom-value');
+
+            if (previewMode === 'camera') {
+                videoImg.style.objectFit = 'cover';
+                videoImg.style.transform = `scaleX(-1) scale(${digitalZoom})`;
+            }
+            zoomValue.textContent = `${digitalZoom.toFixed(1)}x`;
+        }
+
+        function handleAutoShutter(detected, confidence) {
+            const statusEl = document.getElementById('auto-shutter-status');
+
+            if (!autoShutterEnabled) {
+                statusEl.textContent = '자동셔터 꺼짐';
+                return;
+            }
+
+            if (previewMode !== 'camera') {
+                statusEl.textContent = '업로드 이미지 분석 모드';
+                return;
+            }
+
+            if (isCapturing || Date.now() < autoCooldownUntil) {
+                return;
+            }
+
+            if (!detected) {
+                statusEl.textContent = `자동셔터 대기 중 (목표: ${(AUTO_SHUTTER_CONF_THRESHOLD * 100).toFixed(0)}%)`;
+                return;
+            }
+
+            const confPct = (confidence * 100).toFixed(1);
+            statusEl.textContent = `자동셔터 판단 중... (현재: ${confPct}%)`;
+
+            if (confidence >= AUTO_SHUTTER_CONF_THRESHOLD) {
+                statusEl.textContent = `자동셔터 촬영 중... (${confPct}%)`;
+                autoCooldownUntil = Date.now() + 1500;
+                takeSnapshot(true);
+            }
+        }
+
+        function openImageUploader() {
+            document.getElementById('upload-image-input').click();
+        }
+
+        async function restoreCameraPreview() {
+            if (mobileUploadOnlyMode) {
+                return;
+            }
+
+            const videoImg = document.getElementById('video-feed');
+            const captureMessage = document.getElementById('capture-message');
+
+            const cameraReady = await startCaptureCameraSession();
+            if (!cameraReady) {
+                captureMessage.textContent = '카메라를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                return;
+            }
+
+            previewMode = 'camera';
+            stopVideoFallbackPolling();
+            videoImg.onerror = () => {
+                if (previewMode !== 'camera') return;
+                captureMessage.textContent = '실시간 스트림 연결이 불안정하여 프레임 폴백 모드로 전환했습니다.';
+                startVideoFallbackPolling();
+            };
+            videoImg.onload = () => {
+                if (previewMode !== 'camera') return;
+                stopVideoFallbackPolling();
+            };
+            videoImg.src = '';
+            videoImg.src = `/video_feed?t=${Date.now()}`;
+            videoImg.style.objectFit = 'cover';
+            videoImg.style.transform = `scaleX(-1) scale(${digitalZoom})`;
+            captureMessage.textContent = '실시간 카메라 모드로 복귀했습니다.';
+        }
+
+        async function loadImageElementWithOrientation(file, dataUrl) {
+            // createImageBitmap(imageOrientation=from-image)로 EXIF 방향 보정 우선 시도
+            if (window.createImageBitmap && file) {
+                try {
+                    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+                } catch (error) {
+                    // fallback으로 Image 사용
+                }
+            }
+
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = dataUrl;
+            });
+        }
+
+        function normalizeUploadError(error) {
+            const text = String(error?.message || error || '').toLowerCase();
+            if (text.includes('network') || text.includes('fetch') || text.includes('failed to fetch')) {
+                return '네트워크 오류로 업로드에 실패했습니다. 연결 상태를 확인해 주세요.';
+            }
+            if (text.includes('decode') || text.includes('format') || text.includes('mime')) {
+                return '지원하지 않는 이미지 형식입니다. JPG/PNG 파일을 사용해 주세요.';
+            }
+            if (text.includes('server') || text.includes('500') || text.includes('analy')) {
+                return '서버 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+            }
+            return '업로드 이미지 처리에 실패했습니다. 다른 사진으로 다시 시도해 주세요.';
+        }
+
+        function showDetectionToast(result) {
+            if (result?.meta?.analysis_mode === 'upload_single_eye_no_yolo') {
+                return;
+            }
+
+            const hasLeft = !!result?.left_eye;
+            const hasRight = !!result?.right_eye;
+
+            if (hasLeft && hasRight) {
+                return;
+            }
+
+            if (hasLeft || hasRight) {
+                const side = hasLeft ? '왼쪽 눈' : '오른쪽 눈';
+                showToastPopup(`${side}만 감지되었습니다. 정면 얼굴 사진으로 다시 업로드하면 양안 감지 확률이 높아집니다.`);
+                return;
+            }
+
+            showToastPopup('눈이 감지되지 않았습니다. 조명이 밝은 곳에서 얼굴 전체가 나오도록 다시 업로드해 주세요.');
+        }
+
+        function applyUploadedPreview(dataUrl) {
+            const videoImg = document.getElementById('video-feed');
+            const previewHint = document.getElementById('mobile-preview-hint');
+            const reuploadFab = document.getElementById('btn-mobile-reupload');
+
+            stopVideoFallbackPolling();
+            previewMode = 'upload';
+            videoImg.src = dataUrl;
+            videoImg.style.objectFit = 'contain';
+            videoImg.style.transform = 'none';
+            if (previewHint) previewHint.style.display = 'none';
+            if (reuploadFab && mobileUploadOnlyMode) reuploadFab.classList.add('show');
+        }
+
+        async function useLastUploadedImage() {
+            const captureMessage = document.getElementById('capture-message');
+            const dataUrl = localStorage.getItem(LAST_UPLOAD_KEY);
+            if (!dataUrl) {
+                await showToastPopup('최근 업로드 이미지가 없습니다. 먼저 새 이미지를 업로드해 주세요.');
+                return;
+            }
+
+            try {
+                setUploadProgress(true, '최근 업로드 불러오는 중...', '저장된 이미지를 다시 분석합니다.');
+                capturedPhoto = dataUrl;
+                applyUploadedPreview(dataUrl);
+                const analysisResult = await analyzeWithServer(dataUrl);
+                captureMessage.textContent = analysisResult.ok ? '최근 업로드 이미지 재분석 완료' : '최근 업로드 이미지 재분석 실패';
+            } catch (error) {
+                captureMessage.textContent = normalizeUploadError(error);
+            } finally {
+                setUploadProgress(false);
+            }
+        }
+
+        function setResultButtonState(enabled) {
+            const btn = document.getElementById('btn-go-result');
+            btn.disabled = !enabled;
+        }
+
+        function hasAnalysisResult() {
+            // 최소 한쪽 눈 분석 데이터가 있어야 결과 보기 허용
+            return !!readSessionValue('eye_analysis_L') || !!readSessionValue('eye_analysis_R');
+        }
+
+        function goToResult() {
+            if (!hasAnalysisResult()) {
+                showToastPopup('촬영 또는 업로드 후 분석이 완료되면 결과 보기가 가능합니다.');
+                return;
+            }
+            syncCombinedAnalysisToLocalStorage();
+            window.location.href = '/result';
+        }
+
+        function parseStoredJson(key) {
+            const raw = readSessionValue(key);
+            if (!raw) return null;
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                console.warn(`[Storage Parse Error] ${key}`, error);
+                return null;
+            }
+        }
+
+        function normalizeConfidencePercent(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return 0;
+            return num <= 1 ? num * 100 : num;
+        }
+
+        function inferSelectedEyeHint() {
+            const combined = getCombinedAnalysis();
+            const hasLeft = !!combined.left_eye;
+            const hasRight = !!combined.right_eye;
+
+            if (!hasLeft) return 'L';
+            if (!hasRight) return 'R';
+            return null;
+        }
+
+        function getCombinedAnalysis() {
+            const stored = parseStoredJson('bilateral_analysis') || {};
+            const leftStored = parseStoredJson('eye_analysis_L');
+            const rightStored = parseStoredJson('eye_analysis_R');
+
+            return {
+                ...stored,
+                status: (leftStored || stored.left_eye || rightStored || stored.right_eye) ? 'success' : (stored.status || 'idle'),
+                left_eye: leftStored || stored.left_eye || null,
+                right_eye: rightStored || stored.right_eye || null
+            };
+        }
+
+        function syncCombinedAnalysisToLocalStorage(extra = {}) {
+            const combined = {
+                ...getCombinedAnalysis(),
+                ...extra
+            };
+            writeSessionValue('bilateral_analysis', JSON.stringify(combined));
+            return combined;
+        }
+
+        async function handleUploadedImage(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const captureMessage = document.getElementById('capture-message');
+
+            try {
+                if (!String(file.type || '').startsWith('image/')) {
+                    throw new Error('unsupported-image-format');
+                }
+
+                captureMessage.textContent = '업로드 이미지 처리 중...';
+                setUploadProgress(true, '이미지 읽는 중...', '사진 파일을 불러오고 있습니다.');
+                const rawDataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                setUploadProgress(true, '방향 보정 중...', '모바일 EXIF 정보를 반영하고 있습니다.');
+                const srcImg = await loadImageElementWithOrientation(file, rawDataUrl);
+
+                // 업로드 이미지는 1280x720으로 제한 (메인 스레드 블로킹 방지)
+                const maxW = 1280;
+                const maxH = 720;
+                const scale = Math.min(maxW / srcImg.width, maxH / srcImg.height, 1);
+                const outW = Math.max(1, Math.round(srcImg.width * scale));
+                const outH = Math.max(1, Math.round(srcImg.height * scale));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = outW;
+                canvas.height = outH;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(srcImg, 0, 0, outW, outH);
+
+                // 메인 스레드 양보 후 toDataURL 실행 (UI 프리징 방지)
+                await new Promise(r => setTimeout(r, 0));
+                setUploadProgress(true, '이미지 최적화 중...', '분석 전 크기 최적화를 진행합니다.');
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+                localStorage.setItem(LAST_UPLOAD_KEY, dataUrl);
+                setLastUploadAvailability();
+                capturedPhoto = dataUrl;
+                applyUploadedPreview(dataUrl);
+
+                if (mobileUploadOnlyMode) {
+                    setUploadProgress(true, '서버 분석 중...', 'MediaPipe가 좌/우 눈을 감지하고 있습니다.');
+                } else {
+                    setUploadProgress(true, '서버 분석 중...', '업로드 사진은 MediaPipe 얼굴 메쉬 기반 분류를 진행합니다.');
+                }
+                const analysisResult = await analyzeWithServer(dataUrl);
+                captureMessage.textContent = analysisResult.ok ? '업로드/분석 완료' : '업로드/분석 실패';
+            } catch (error) {
+                console.error('[Upload Analyze Error]', error);
+                captureMessage.textContent = normalizeUploadError(error);
+            } finally {
+                setUploadProgress(false);
+                event.target.value = '';
+            }
+        }
+
+        // ==========================================
+        // 카메라 이미지 캡처 및 분석
+        // ==========================================
+        async function takeSnapshot(isAuto = false) {
+            if (mobileUploadOnlyMode) {
+                await showToastPopup('모바일에서는 사진 업로드 방식으로 촬영을 진행해 주세요.');
+                openImageUploader();
+                return;
+            }
+
+            if (isCapturing) {
+                return;
+            }
+
+            isCapturing = true;
+            const videoImg = document.getElementById('video-feed');
+            const captureMessage = document.getElementById('capture-message');
+            try {
+                captureMessage.textContent = isAuto ? '자동셔터 촬영 중...' : '촬영 및 분석 중...';
+
+                // 1. 고해상도 캡처 캔버스 생성 (해상도 방어)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 1920;
+                tempCanvas.height = 1080;
+                const ctx = tempCanvas.getContext('2d');
+
+                // 2. 줌 배율을 캡처에도 동일하게 반영 (중앙 크롭)
+                const sourceWidth = videoImg.naturalWidth || 640;
+                const sourceHeight = videoImg.naturalHeight || 480;
+                const cropWidth = sourceWidth / digitalZoom;
+                const cropHeight = sourceHeight / digitalZoom;
+                const sx = (sourceWidth - cropWidth) / 2;
+                const sy = (sourceHeight - cropHeight) / 2;
+
+                // (UI는 거울처럼 반전되어 있지만, AI 진단을 위해 원본 방향 그대로 캡처합니다)
+                ctx.drawImage(videoImg, sx, sy, cropWidth, cropHeight, 0, 0, tempCanvas.width, tempCanvas.height);
+
+                // 3. 이미지를 Base64 데이터로 변환
+                const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
+                capturedPhoto = dataUrl;
+
+                // 서버로 전송
+                await analyzeWithServer(dataUrl);
+                captureMessage.textContent = '촬영/분석 완료';
+            } catch (error) {
+                captureMessage.textContent = '촬영/분석 실패. 다시 시도해 주세요.';
+                console.error('[Capture Error]', error);
+            } finally {
+                isCapturing = false;
+            }
+        }
+
+        // ==========================================
+        // 서버 분석 (Base64 이미지 → EfficientNet)
+        // ==========================================
+        async function analyzeWithServer(base64Image) {
+            const captureMessage = document.getElementById('capture-message');
+            try {
+                captureMessage.textContent = '서버 분석 중 (MediaPipe 눈 자동 감지)...';
+                const userId = readSessionValue('user_id') || 'anonymous';
+                const selectedEyeHint = inferSelectedEyeHint();
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        user_id: userId,
+                        selected_eye: selectedEyeHint,
+                        capture_source: previewMode,
+                        mobile_upload_only: mobileUploadOnlyMode
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // MediaPipe가 감지한 좌/우 눈을 각각 저장 (없으면 이전 값 유지)
+                    if (result.left_eye)  writeSessionValue('eye_analysis_L', JSON.stringify(result.left_eye));
+                    if (result.right_eye) writeSessionValue('eye_analysis_R', JSON.stringify(result.right_eye));
+
+                    const isUploadNoYoloMode = result?.meta?.analysis_mode === 'upload_single_eye_no_yolo';
+                    const detectedSides = [result.left_eye ? '좌안' : null, result.right_eye ? '우안' : null].filter(Boolean);
+                    const detectedText = isUploadNoYoloMode
+                        ? '업로드 단안 분석 완료'
+                        : (detectedSides.length ? detectedSides.join(', ') + ' 감지됨' : '눈 감지 실패 - 다시 시도해 주세요');
+
+                    syncCombinedAnalysisToLocalStorage({
+                        status: result.status || 'success',
+                        guide: result.guide,
+                        meta: result.meta,
+                        message: result.message,
+                        user_id: result.user_id,
+                        yolo_cam_image_url: result.yolo_cam_image_url,
+                        saved_image_url: result.saved_image_url
+                    });
+
+                    if (capturedPhoto) writeSessionValue('bilateral_capture', capturedPhoto);
+
+                    captureMessage.textContent = detectedText;
+                    setResultButtonState(hasAnalysisResult());
+                    showDetectionToast(result);
+                    return { ok: true, left: !!result.left_eye, right: !!result.right_eye, result };
+                } else {
+                    captureMessage.textContent = result.error || '분석 중 오류가 발생했습니다.';
+                    setResultButtonState(hasAnalysisResult());
+                    return { ok: false, message: result.error || '분석 중 오류' };
+                }
+            } catch (error) {
+                console.error('[Server Analysis Error]', error);
+                captureMessage.textContent = '서버 통신 오류가 발생했습니다.';
+                setResultButtonState(hasAnalysisResult());
+                return { ok: false, message: String(error || 'server-error') };
+            }
+        }
+
+        // 화면 로딩 시 프레임 스트리밍 및 감지 폴링 시작
+        window.onload = async () => {
+            syncUserScopedCaptureCache();
+            clearSessionCaptureData();
+
+            // 모바일 전용 모드 자동 활성화
+            enableMobileUploadOnlyMode();
+
+            const videoImg = document.getElementById('video-feed');
+            videoImg.style.objectFit = 'contain';
+            videoImg.style.transform = 'none';
+
+            capturedPhoto = null;
+            analysisReady = false;
+            setLastUploadAvailability();
+            previewMode = 'upload';
+            setResultButtonState(false);
+        };
+
+        // 페이지 종료 시 폴링 중지
+        window.onbeforeunload = () => {
+            if (detectionPollingInterval) {
+                clearInterval(detectionPollingInterval);
+            }
+            stopVideoFallbackPolling();
+            stopCaptureCameraSession();
+        };
+
+        window.addEventListener('pagehide', () => {
+            stopCaptureCameraSession();
+        });
+
+        // ==========================================
+        // 유동적 반응형 조정 함수
+        // ==========================================
+        let resizeObserver = null;
+        let lastViewportWidth = window.innerWidth;
+        let lastViewportHeight = window.innerHeight;
+        let resizeTimeout = null;
+
+        function adjustResponsiveLayout() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const isMobileScreen = width <= 768;
+            const isTablet = width > 768 && width <= 1024;
+            const isLandscape = height < width;
+            const bodyEl = document.body;
+
+            // 뷰포트 크기 기반 CSS 변수 업데이트 (유동적 스케일링)
+            const vwUnit = (width / 100);
+            const vhUnit = (height / 100);
+            
+            document.documentElement.style.setProperty('--viewport-width', width + 'px');
+            document.documentElement.style.setProperty('--viewport-height', height + 'px');
+            document.documentElement.style.setProperty('--is-mobile', isMobileScreen ? '1' : '0');
+            document.documentElement.style.setProperty('--is-tablet', isTablet ? '1' : '0');
+            document.documentElement.style.setProperty('--is-landscape', isLandscape ? '1' : '0');
+
+            // 가로 모드에서 영역 최적화
+            if (isLandscape && height < 600) {
+                if (resizeObserver) resizeObserver.disconnect();
+                const rightPanel = document.querySelector('.right-panel');
+                if (rightPanel && !rightPanel.dataset.observing) {
+                    rightPanel.style.maxHeight = (height - 60) + 'px';
+                    rightPanel.style.overflowY = 'auto';
+                    rightPanel.dataset.observing = '1';
+                }
+            } else if (resizeObserver) {
+                const rightPanel = document.querySelector('.right-panel');
+                if (rightPanel) {
+                    rightPanel.style.maxHeight = '';
+                    rightPanel.dataset.observing = '';
+                }
+            }
+
+            // 버튼 크기 동적 조정
+            if (isMobileScreen) {
+                const buttons = document.querySelectorAll('.btn-capture, .btn-upload, .btn-restore, .btn-go-result');
+                buttons.forEach(btn => {
+                    if (width <= 480) {
+                        btn.style.minHeight = 'clamp(44px, 12vw, 48px)';
+                    } else {
+                        btn.style.minHeight = 'clamp(48px, 10vw, 52px)';
+                    }
+                });
+            }
+
+            // 태블릿에서 투컬럼 가능 시 활성화
+            if (isTablet && !isLandscape) {
+                const leftPanel = document.querySelector('.left-panel');
+                const rightPanel = document.querySelector('.right-panel');
+                if (leftPanel && rightPanel) {
+                    bodyEl.style.flexDirection = 'column';
+                }
+            }
+        }
+
+        function setupResponsiveListener() {
+            // 창 크기 변화 감지 (500ms 디바운싱)
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const newWidth = window.innerWidth;
+                    const newHeight = window.innerHeight;
+
+                    if (Math.abs(newWidth - lastViewportWidth) > 50 || 
+                        Math.abs(newHeight - lastViewportHeight) > 50) {
+                        lastViewportWidth = newWidth;
+                        lastViewportHeight = newHeight;
+                        adjustResponsiveLayout();
+                    }
+                }, 500);
+            }, { passive: true });
+
+            // 방향 변화 감지
+            window.addEventListener('orientationchange', () => {
+                setTimeout(() => {
+                    adjustResponsiveLayout();
+                }, 100);
+            }, { passive: true });
+
+            // VH 단위 문제 해결 (모바일 주소창)
+            window.addEventListener('visualViewportChange', () => {
+                setTimeout(adjustResponsiveLayout, 100);
+            }, { passive: true });
+
+            // 초기 레이아웃 조정
+            setTimeout(adjustResponsiveLayout, 100);
+        }
+
+        // 페이지 로드 완료 후 리스너 설정
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupResponsiveListener);
+        } else {
+            setupResponsiveListener();
+        }
+
+        // ==========================================
+        // 유동적 성능 및 UX 최적화
+        // ==========================================
+        function getScreenCategory() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const isLandscape = h < w;
+
+            if (w <= 380) return 'xs-phone'; // 극소형 폰
+            if (w <= 480) return 'sm-phone'; // 소형 폰
+            if (w <= 768) return 'md-phone'; // 중형 폰
+            if (w <= 1024) return isLandscape ? 'tablet-landscape' : 'tablet-portrait';
+            return 'desktop';
+        }
+
+        function optimizeForScreenSize() {
+            const category = getScreenCategory();
+            const videoImg = document.getElementById('video-feed');
+            const videoContainer = document.querySelector('.video-container');
+            const rightPanel = document.querySelector('.right-panel');
+
+            // 화면 크기별 비디오 프레임 폴링 속도 조정
+            const pollingRates = {
+                'xs-phone': 750,      // 극소형: 느린 폴링
+                'sm-phone': 500,      // 소형: 중간 폴링
+                'md-phone': 500,      // 중형: 중간 폴링
+                'tablet-landscape': 250, // 태블릿 가로: 빠른 폴링
+                'tablet-portrait': 350,  // 태블릿 세로: 중간 폴링
+                'desktop': 250        // 데스크톱: 빠른 폴링
+            };
+
+            // 예측 가능한 폭 조정
+            if (category.includes('xs')) {
+                if (videoImg) videoImg.style.maxWidth = '100%';
+                if (rightPanel) rightPanel.style.maxWidth = '100%';
+            }
+
+            // 번들 최적화 (극소형에서 불필요한 스타일 제거)
+            if (category === 'xs-phone' || category === 'sm-phone') {
+                // 애니메이션 최소화
+                const style = document.createElement('style');
+                style.textContent = `
+                    .hint-pulse { animation-iteration-count: 1 !important; }
+                    .theme-toggle-floating { transition: none !important; }
+                `;
+                // document.head.appendChild(style); // 주석: 기존 코드 보존
+            }
+        }
+
+        function handleDevicePixelRatio() {
+            const dpr = window.devicePixelRatio || 1;
+            
+            // 고해상도 기기에서 폰트 크기 미세 조정
+            if (dpr >= 2) {
+                document.documentElement.style.setProperty('--dpr-scale', String(dpr));
+            }
+
+            // Retina 디스플레이에서 이미지 품질 조정
+            if (dpr >= 3) {
+                const videoImg = document.getElementById('video-feed');
+                if (videoImg && previewMode === 'camera') {
+                    // 더 높은 품질의 프레임 요청 (필요시)
+                }
+            }
+        }
+
+        function setupAccessibilityEnhancements() {
+            const buttons = document.querySelectorAll('button, input[type="range"]');
+            
+            buttons.forEach(btn => {
+                // 터치 기기에서 포커스 네비게이션 개선
+                btn.addEventListener('focus', function() {
+                    if (window.matchMedia('(hover: none)').matches) {
+                        this.style.outline = '3px solid var(--primary)';
+                        this.style.outlineOffset = '2px';
+                    }
+                });
+
+                btn.addEventListener('blur', function() {
+                    this.style.outline = '';
+                    this.style.outlineOffset = '';
+                });
+            });
+
+            // 키보드 네비게이션 개선
+            document.addEventListener('keydown', (e) => {
+                if (window.matchMedia('(hover: none)').matches) return;
+
+                if (e.key === 'Tab') {
+                    document.documentElement.classList.add('keyboard-nav');
+                }
+            });
+
+            document.addEventListener('mousedown', () => {
+                document.documentElement.classList.remove('keyboard-nav');
+            });
+        }
+
+        function initFluidLayoutSystem() {
+            optimizeForScreenSize();
+            handleDevicePixelRatio();
+            setupAccessibilityEnhancements();
+
+            // 미디어 쿼리 변경 감지
+            const mobileQuery = window.matchMedia('(max-width: 768px)');
+            const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const touchQuery = window.matchMedia('(hover: none)');
+
+            mobileQuery.addEventListener('change', (e) => {
+                if (e.matches) {
+                    document.body.classList.add('on-mobile');
+                } else {
+                    document.body.classList.remove('on-mobile');
+                }
+            });
+
+            darkQuery.addEventListener('change', () => {
+                adjustResponsiveLayout();
+            });
+
+            touchQuery.addEventListener('change', (e) => {
+                if (e.matches) {
+                    document.body.classList.add('touch-device');
+                } else {
+                    document.body.classList.remove('touch-device');
+                }
+            });
+
+            // 초기 상태 설정
+            if (window.matchMedia('(max-width: 768px)').matches) {
+                document.body.classList.add('on-mobile');
+            }
+            if (window.matchMedia('(hover: none)').matches) {
+                document.body.classList.add('touch-device');
+            }
+        }
+
+        // 페이지 로드 후 유동적 레이아웃 시스템 초기화
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initFluidLayoutSystem);
+        } else {
+            initFluidLayoutSystem();
+        }
+
+        // ==========================================
+        // 고급 유동적 반응형 상태 관리
+        // ==========================================
+        class FluidResponsiveManager {
+            constructor() {
+                this.state = {
+                    screenCategory: getScreenCategory(),
+                    isPortrait: window.matchMedia('(orientation: portrait)').matches,
+                    isTouchDevice: window.matchMedia('(hover: none)').matches,
+                    darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
+                    reduceMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+                    highContrast: window.matchMedia('(prefers-contrast: more)').matches,
+                };
+
+                this.observers = [];
+                this.setupObservers();
+                this.applyInitialState();
+            }
+
+            setupObservers() {
+                // 방향 변화
+                window.matchMedia('(orientation: portrait)').addEventListener('change', (e) => {
+                    this.state.isPortrait = e.matches;
+                    this.notifyObservers('orientation');
+                });
+
+                // 컬러 스킴 변화
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                    this.state.darkMode = e.matches;
+                    this.notifyObservers('colorScheme');
+                });
+
+                // 모션 선호 변화
+                window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+                    this.state.reduceMotion = e.matches;
+                    this.notifyObservers('motion');
+                });
+
+                // 명도 대비 선호 변화
+                window.matchMedia('(prefers-contrast: more)').addEventListener('change', (e) => {
+                    this.state.highContrast = e.matches;
+                    this.notifyObservers('contrast');
+                });
+
+                // 터치 능력 변화
+                window.matchMedia('(hover: none)').addEventListener('change', (e) => {
+                    this.state.isTouchDevice = e.matches;
+                    this.notifyObservers('touchCapability');
+                });
+            }
+
+            applyInitialState() {
+                const root = document.documentElement;
+                root.className = `
+                    screen-${this.state.screenCategory}
+                    ${this.state.isPortrait ? 'orientation-portrait' : 'orientation-landscape'}
+                    ${this.state.isTouchDevice ? 'touch-capable' : 'no-touch'}
+                    ${this.state.darkMode ? 'dark-mode' : 'light-mode'}
+                    ${this.state.reduceMotion ? 'reduce-motion' : 'motion-ok'}
+                    ${this.state.highContrast ? 'high-contrast' : 'normal-contrast'}
+                `.trim().split(/\s+/).join(' ');
+
+                this.updateBodyClasses();
+            }
+
+            updateBodyClasses() {
+                const bodyEl = document.body;
+                
+                // 스크린 크기 클래스
+                bodyEl.classList.remove(
+                    'xs-phone', 'sm-phone', 'md-phone',
+                    'tablet-portrait', 'tablet-landscape', 'desktop'
+                );
+                bodyEl.classList.add(this.state.screenCategory);
+
+                // 특성 클래스
+                if (this.state.isTouchDevice) {
+                    bodyEl.classList.add('touch-device');
+                    bodyEl.classList.remove('mouse-device');
+                } else {
+                    bodyEl.classList.add('mouse-device');
+                    bodyEl.classList.remove('touch-device');
+                }
+
+                if (this.state.isPortrait) {
+                    bodyEl.classList.add('portrait-mode');
+                    bodyEl.classList.remove('landscape-mode');
+                } else {
+                    bodyEl.classList.add('landscape-mode');
+                    bodyEl.classList.remove('portrait-mode');
+                }
+
+                if (this.state.reduceMotion) {
+                    bodyEl.classList.add('disable-animations');
+                } else {
+                    bodyEl.classList.remove('disable-animations');
+                }
+            }
+
+            subscribe(callback) {
+                this.observers.push(callback);
+                return () => {
+                    this.observers = this.observers.filter(obs => obs !== callback);
+                };
+            }
+
+            notifyObservers(changeType) {
+                this.state.screenCategory = getScreenCategory();
+                this.updateBodyClasses();
+                this.observers.forEach(obs => obs(changeType, this.state));
+            }
+
+            getState() {
+                return { ...this.state };
+            }
+        }
+
+        // 전역 반응형 매니저 인스턴스
+        const fluidManager = new FluidResponsiveManager();
+
+        // 반응형 상태 변화 구독 예시
+        fluidManager.subscribe((changeType, state) => {
+            if (changeType === 'orientation' && !state.isPortrait) {
+                // 가로 모드: 우측 패널 스크롤 활성화
+                const rightPanel = document.querySelector('.right-panel');
+                if (rightPanel && state.screenCategory.includes('phone')) {
+                    rightPanel.classList.add('touch-scroll');
+                }
+            }
+        });
+
+        // ==========================================
+        // 유동적 레이아웃 계산 함수
+        // ==========================================
+        function calculateFluidDimensions() {
+            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+            const dimensions = {
+                vw,
+                vh,
+                isMobile: vw <= 768,
+                isTablet: vw > 768 && vw <= 1024,
+                isDesktop: vw > 1024,
+                isLandscape: vh < vw,
+                isTall: vh > 1200,
+                isCompact: vh < 600,
+                aspectRatio: vw / vh,
+            };
+
+            return dimensions;
+        }
+
+        // 레이아웃 계산을 주기적으로 업데이트
+        let layoutCheckInterval = null;
+
+        function startLayoutMonitoring() {
+            layoutCheckInterval = setInterval(() => {
+                const dims = calculateFluidDimensions();
+                document.documentElement.style.setProperty('--viewport-aspect', String(dims.aspectRatio));
+            }, 1000);
+        }
+
+        function stopLayoutMonitoring() {
+            if (layoutCheckInterval) clearInterval(layoutCheckInterval);
+        }
+
+        // 페이지 언로드 시 모니터링 중지
+        window.addEventListener('beforeunload', stopLayoutMonitoring);
+
+        // 초기 모니터링 시작
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startLayoutMonitoring);
+        } else {
+            startLayoutMonitoring();
+        }
+
+
+    </script>
+    <script>
+        (function () {
+            const root = document.documentElement;
+            function currentTheme() {
+                const t = root.getAttribute('data-theme');
+                return (t === 'dark' || t === 'light') ? t : 'light';
+            }
+            function applyTheme(theme, persist) {
+                root.setAttribute('data-theme', theme);
+                if (persist) {
+                    try { localStorage.setItem('theme', theme); } catch (e) {}
+                }
+                const btn = document.getElementById('global-theme-toggle');
+                if (!btn) return;
+                const icon = btn.querySelector('[data-role="icon"]');
+                const label = btn.querySelector('[data-role="label"]');
+                if (theme === 'dark') {
+                    if (icon) icon.textContent = '☀️';
+                    if (label) label.textContent = '라이트 모드';
+                } else {
+                    if (icon) icon.textContent = '🌙';
+                    if (label) label.textContent = '다크 모드';
+                }
+            }
+            applyTheme(currentTheme(), false);
+        })();
+    </script>
+    <script src="/static/js/timeout.js"></script>
+    </body>
+    </html>

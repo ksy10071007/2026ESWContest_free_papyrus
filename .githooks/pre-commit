@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Allow intentional Jetson updates only with explicit override.
+if [[ "${ALLOW_JETSON_CHANGES:-0}" == "1" ]]; then
+  exit 0
+fi
+
+protected_paths=(
+  "inference/jetson_backend.py"
+  "requirements_jetson.txt"
+)
+
+staged_jetson_changes="$(git diff --cached --name-only -- "${protected_paths[@]}")"
+
+if [[ -n "$staged_jetson_changes" ]]; then
+  echo "[BLOCKED] Jetson-specific files are staged:"
+  echo "$staged_jetson_changes"
+  echo ""
+  echo "RPi5 workflow safety rule: do not commit Jetson files by default."
+  echo "If this change is intentional, commit with:"
+  echo "  ALLOW_JETSON_CHANGES=1 git commit -m '...'"
+  exit 1
+fi
+
+exit 0

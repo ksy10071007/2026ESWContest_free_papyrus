@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 설정 - Eye Project</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #1d1d1f;
+            --border: #d2d2d7;
+            --muted: #64748b;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --border: #2a3240;
+            --muted: #aab3c2;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 4000;
+            display: none;
+        }
+
+        .confirm-toast.show { display: block; }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        [data-theme="dark"] .field {
+            background: #111827;
+        }
+
+        [data-theme="dark"] .field label {
+            color: #cbd5e1;
+        }
+
+        [data-theme="dark"] .field input,
+        [data-theme="dark"] .field select {
+            background: #0f172a;
+            color: var(--text);
+        }
+
+        [data-theme="dark"] .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            width: 1280px;
+            height: 800px;
+            overflow: hidden;
+            box-sizing: border-box;
+            padding: 24px;
+        }
+
+        .layout {
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .desc {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-top: 6px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            overflow: auto;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .section-title {
+            margin: 16px 0 10px 0;
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .llm-note {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .field {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            background: #fff;
+        }
+
+        .field-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .key-chip {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: var(--primary);
+            background: rgba(0, 122, 255, 0.08);
+            border: 1px solid rgba(0, 122, 255, 0.18);
+            padding: 2px 8px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .field-desc {
+            font-size: 0.8rem;
+            color: var(--muted);
+            line-height: 1.45;
+            margin-bottom: 8px;
+        }
+
+        .field-hint {
+            font-size: 0.77rem;
+            color: #475569;
+            background: #f8fafc;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+            line-height: 1.35;
+        }
+
+        [data-theme="dark"] .field-hint {
+            background: #0f172a;
+            color: #cbd5e1;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #334155;
+        }
+
+        .field input,
+        .field select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 11px 16px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: #fff;
+        }
+
+        .status {
+            font-size: 0.88rem;
+            color: var(--muted);
+            margin-right: auto;
+            align-self: center;
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
+                overflow-y: auto;
+                padding: 12px;
+            }
+
+            .layout {
+                height: auto;
+                min-height: calc(100dvh - 24px);
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            .card {
+                padding: 12px;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                width: 100%;
+                min-height: 48px;
+            }
+
+            .status {
+                margin-right: 0;
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div class="header">
+        <div>
+            <h1 data-i18n="admin_config_title">⚙️ 관리자 Config 설정</h1>
+            <div class="desc">admin 로그인 상태에서만 접근 가능합니다. 저장 시 일부 항목은 서버 재시작 후 완전 적용됩니다.</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" onclick="logoutAdmin()">로그아웃</button>
+            <button class="btn btn-secondary" onclick="location.href='/'">메인으로</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title" data-i18n="section_general_settings">일반 시스템 설정</div>
+        <div id="config-grid" class="config-grid"></div>
+
+        <div class="section-title" data-i18n="section_llm_settings">LLM/API 키 설정</div>
+        <div class="llm-note">API 키는 마스킹되어 표시됩니다. 비워두면 기존 키 유지, 새 값을 입력하면 즉시 갱신됩니다.</div>
+        <div id="llm-config-grid" class="config-grid"></div>
+    </div>
+
+    <div class="actions">
+        <div id="status" class="status" data-i18n="status_loading_config">설정을 불러오는 중...</div>
+        <button class="btn btn-warning" onclick="requestServerControl('restart')">서버 재시작</button>
+        <button class="btn btn-danger" onclick="requestServerControl('shutdown')">서버 종료</button>
+        <button class="btn btn-secondary" onclick="loadConfig()">새로고침</button>
+        <button class="btn btn-primary" onclick="saveConfig()">저장</button>
+    </div>
+</div>
+
+<div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+    <div id="confirm-toast-message" class="confirm-toast-message"></div>
+    <div class="confirm-toast-actions">
+        <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel">취소</button>
+        <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">확인</button>
+    </div>
+</div>
+
+<script>
+    const configState = { values: {}, keys: [], llmSettings: {} };
+    let adminCsrfToken = '';
+    const CONFIG_HELP = {
+        SERVER_IP: {
+            title: '서버 바인딩 IP',
+            description: 'Flask 서버가 수신 대기할 네트워크 주소입니다.',
+            hint: '일반적으로 0.0.0.0(외부 접속 허용) 사용. 로컬 전용은 127.0.0.1.'
+        },
+        SERVER_PORT: {
+            title: '서버 포트',
+            description: '웹 UI 접속 포트 번호입니다.',
+            hint: '기본 5000. 방화벽/프록시 환경에 맞춰 변경 (1~65535).'
+        },
+        DEBUG_MODE: {
+            title: '디버그 모드',
+            description: '오류 상세 로그 및 자동 리로드 사용 여부입니다.',
+            hint: '개발 중에만 True 권장. 운영/배포는 False 권장.'
+        },
+        CAMERA_DEVICE_INDEX: {
+            title: '카메라 장치 번호',
+            description: 'OpenCV가 열 카메라 인덱스입니다.',
+            hint: '내장 카메라가 0인 경우가 많음. 인식 안되면 1, 2 순서로 확인.'
+        },
+        YOLO_CONF_THRESHOLD: {
+            title: 'YOLO 검출 임계값(분석)',
+            description: '분석 파이프라인에서 눈을 검출할 최소 신뢰도입니다.',
+            hint: '값↑: 오검출 감소/미검출 증가, 값↓: 검출 증가/잡음 증가. 보통 0.4~0.6.'
+        },
+        YOLO_IOU_THRESHOLD: {
+            title: 'YOLO NMS IoU 임계값',
+            description: '중복 박스 제거 기준(IoU)입니다.',
+            hint: '일반적으로 0.4~0.6. 너무 낮으면 박스가 과도하게 제거될 수 있음.'
+        },
+        YOLO_STATUS_CONF_THRESHOLD: {
+            title: '상태 표시용 임계값',
+            description: '실시간 감지 상태(/detect_status) 판정용 최소 신뢰도입니다.',
+            hint: '자동셔터 체감에 영향. 너무 높으면 감지 점등이 잘 안됨.'
+        },
+        YOLO_INPUT_SIZE: {
+            title: 'YOLO 입력 해상도',
+            description: '검출 모델 입력 크기(px)입니다.',
+            hint: '값↑: 정확도 향상 가능/속도 저하, 값↓: 속도 향상/정밀도 저하. 보통 640.'
+        },
+        CLASSIFIER_CONFIDENCE_THRESHOLD: {
+            title: '분류 신뢰도 임계값',
+            description: '질환 분류 결과를 신뢰할 최소 확률 기준입니다.',
+            hint: '값↑: 보수적 판정, 값↓: 민감한 판정. 보통 0.6~0.8 권장.'
+        },
+        IRIS_REMOVAL_ENABLED: {
+            title: '홍채 제거 사용 여부',
+            description: '충혈도 계산 전 홍채 영역 제외 처리 활성화입니다.',
+            hint: 'True 권장. 특정 환경에서 오히려 불안정하면 False로 비교 테스트.'
+        },
+        IRIS_THRESHOLD: {
+            title: '홍채 제거 임계값',
+            description: '홍채 분리 민감도를 조절합니다.',
+            hint: '값↑: 더 엄격하게 제거, 값↓: 완화. 과도 조정 시 공막 정보 손실 가능.'
+        },
+        AUTO_DIST_THRESHOLD: {
+            title: '자동촬영 중심 거리 허용치',
+            description: '가이드 중심과 눈 중심 간 허용 거리(px)입니다.',
+            hint: '값↓: 정렬 엄격(촬영 어려움), 값↑: 정렬 완화(오정렬 촬영 가능).'
+        },
+        AUTO_SCALE_MIN: {
+            title: '자동촬영 최소 크기 비율',
+            description: '눈 크기가 가이드 대비 이 값 이상일 때만 통과합니다.',
+            hint: '값↑: 더 가까이 맞춰야 함. 보통 0.75~0.9 범위에서 조정.'
+        },
+        AUTO_SCALE_MAX: {
+            title: '자동촬영 최대 크기 비율',
+            description: '눈 크기가 가이드 대비 이 값 이하일 때만 통과합니다.',
+            hint: '값↓: 너무 가까운 촬영 방지. 보통 1.0~1.2 범위에서 조정.'
+        },
+        AUTO_CAPTURE_HOLD_FRAMES: {
+            title: '자동촬영 유지 프레임',
+            description: '조건을 연속으로 만족해야 하는 프레임 수입니다.',
+            hint: '값↑: 흔들림에 강함/반응 느림, 값↓: 반응 빠름/오촬영 가능성 증가.'
+        }
+    };
+
+    const LLM_HELP = {
+        LLM_PROVIDER: {
+            title: 'LLM 제공자',
+            description: '채팅 API(/api/chat)에서 사용할 LLM 벤더를 선택합니다.',
+            hint: 'openai 또는 gemini 중 하나를 선택하세요.'
+        },
+        OPENAI_MODEL: {
+            title: 'OpenAI 모델',
+            description: 'OpenAI 제공자 선택 시 사용할 모델명입니다.',
+            hint: '예: gpt-4o-mini, gpt-4.1-mini'
+        },
+        GEMINI_MODEL: {
+            title: 'Gemini 모델',
+            description: 'Gemini 제공자 선택 시 사용할 모델명입니다.',
+            hint: '예: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash'
+        },
+        OPENAI_API_KEY: {
+            title: 'OpenAI API Key',
+            description: 'OpenAI API 인증 키입니다.',
+            hint: '새 키를 입력하면 기존 키를 덮어씁니다. 비워두면 기존 키 유지.'
+        },
+        GEMINI_API_KEY: {
+            title: 'Gemini API Key',
+            description: 'Google Gemini API 인증 키입니다.',
+            hint: '새 키를 입력하면 기존 키를 덮어씁니다. 비워두면 기존 키 유지.'
+        }
+    };
+
+    function getConfigMeta(key) {
+        return CONFIG_HELP[key] || {
+            title: key,
+            description: '설정 설명이 준비되지 않은 항목입니다.',
+            hint: '값 수정 시 동작 영향도를 먼저 테스트하세요.'
+        };
+    }
+
+    function setStatus(text, isError = false) {
+        const el = document.getElementById('status');
+        el.textContent = text;
+        el.style.color = isError ? '#dc2626' : '#64748b';
+    }
+
+    function getAdminCsrfToken() {
+        if (adminCsrfToken) return adminCsrfToken;
+        try {
+            const token = sessionStorage.getItem('admin_csrf_token') || '';
+            if (token) {
+                adminCsrfToken = token;
+                return token;
+            }
+        } catch (e) {}
+        return '';
+    }
+
+    function buildAdminHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getAdminCsrfToken();
+        if (token) {
+            headers['X-Admin-CSRF'] = token;
+        }
+        return headers;
+    }
+
+    function renderConfigFields() {
+        const grid = document.getElementById('config-grid');
+        if (!configState.keys.length) {
+            grid.innerHTML = '<div style="color:#64748b;">표시할 설정이 없습니다.</div>';
+            return;
+        }
+
+        grid.innerHTML = configState.keys.map((key) => {
+            const value = configState.values[key];
+            const type = typeof value;
+            const meta = getConfigMeta(key);
+
+            if (type === 'boolean') {
+                return `
+                    <div class="field">
+                        <div class="field-top">
+                            <label>${meta.title}</label>
+                            <span class="key-chip">${key}</span>
+                        </div>
+                        <div class="field-desc">${meta.description}</div>
+                        <div class="field-hint">💡 ${meta.hint}</div>
+                        <select data-key="${key}">
+                            <option value="true" ${value ? 'selected' : ''}>True</option>
+                            <option value="false" ${!value ? 'selected' : ''}>False</option>
+                        </select>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="field">
+                    <div class="field-top">
+                        <label>${meta.title}</label>
+                        <span class="key-chip">${key}</span>
+                    </div>
+                    <div class="field-desc">${meta.description}</div>
+                    <div class="field-hint">💡 ${meta.hint}</div>
+                    <input data-key="${key}" value="${String(value ?? '')}">
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderLLMFields() {
+        const grid = document.getElementById('llm-config-grid');
+        const llm = configState.llmSettings || {};
+
+        grid.innerHTML = `
+            <div class="field">
+                <div class="field-top">
+                    <label>${LLM_HELP.LLM_PROVIDER.title}</label>
+                    <span class="key-chip">LLM_PROVIDER</span>
+                </div>
+                <div class="field-desc">${LLM_HELP.LLM_PROVIDER.description}</div>
+                <div class="field-hint">💡 ${LLM_HELP.LLM_PROVIDER.hint}</div>
+                <select data-llm-key="LLM_PROVIDER">
+                    <option value="openai" ${(llm.LLM_PROVIDER || 'openai') === 'openai' ? 'selected' : ''}>openai</option>
+                    <option value="gemini" ${(llm.LLM_PROVIDER || 'openai') === 'gemini' ? 'selected' : ''}>gemini</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <div class="field-top">
+                    <label>${LLM_HELP.OPENAI_MODEL.title}</label>
+                    <span class="key-chip">OPENAI_MODEL</span>
+                </div>
+                <div class="field-desc">${LLM_HELP.OPENAI_MODEL.description}</div>
+                <div class="field-hint">💡 ${LLM_HELP.OPENAI_MODEL.hint}</div>
+                <input data-llm-key="OPENAI_MODEL" value="${String(llm.OPENAI_MODEL || 'gpt-4o-mini')}">
+            </div>
+
+            <div class="field">
+                <div class="field-top">
+                    <label>${LLM_HELP.GEMINI_MODEL.title}</label>
+                    <span class="key-chip">GEMINI_MODEL</span>
+                </div>
+                <div class="field-desc">${LLM_HELP.GEMINI_MODEL.description}</div>
+                <div class="field-hint">💡 ${LLM_HELP.GEMINI_MODEL.hint}</div>
+                <input data-llm-key="GEMINI_MODEL" value="${String(llm.GEMINI_MODEL || 'gemini-2.5-flash')}">
+            </div>
+
+            <div class="field">
+                <div class="field-top">
+                    <label>${LLM_HELP.OPENAI_API_KEY.title}</label>
+                    <span class="key-chip">OPENAI_API_KEY</span>
+                </div>
+                <div class="field-desc">${LLM_HELP.OPENAI_API_KEY.description}</div>
+                <div class="field-hint">💡 ${LLM_HELP.OPENAI_API_KEY.hint}</div>
+                <input type="password" data-llm-key="OPENAI_API_KEY" placeholder="현재: ${String(llm.OPENAI_API_KEY_MASKED || '미설정')}">
+                <div style="margin-top:6px; font-size:0.78rem; color:#64748b;">상태: ${llm.OPENAI_API_KEY_CONFIGURED ? '설정됨' : '미설정'}</div>
+            </div>
+
+            <div class="field">
+                <div class="field-top">
+                    <label>${LLM_HELP.GEMINI_API_KEY.title}</label>
+                    <span class="key-chip">GEMINI_API_KEY</span>
+                </div>
+                <div class="field-desc">${LLM_HELP.GEMINI_API_KEY.description}</div>
+                <div class="field-hint">💡 ${LLM_HELP.GEMINI_API_KEY.hint}</div>
+                <input type="password" data-llm-key="GEMINI_API_KEY" placeholder="현재: ${String(llm.GEMINI_API_KEY_MASKED || '미설정')}">
+                <div style="margin-top:6px; font-size:0.78rem; color:#64748b;">상태: ${llm.GEMINI_API_KEY_CONFIGURED ? '설정됨' : '미설정'}</div>
+            </div>
+        `;
+    }
+
+    async function loadConfig() {
+        try {
+            setStatus('설정을 불러오는 중...');
+            const res = await fetch('/api/admin/config');
+            const data = await res.json();
+
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || '설정 조회 실패');
+            }
+
+            configState.values = data.config || {};
+            configState.keys = data.editable_keys || Object.keys(configState.values);
+            configState.llmSettings = data.llm_settings || {};
+            adminCsrfToken = String(data.csrf_token || '').trim();
+            if (adminCsrfToken) {
+                try { sessionStorage.setItem('admin_csrf_token', adminCsrfToken); } catch (e) {}
+            }
+            renderConfigFields();
+            renderLLMFields();
+            setStatus('설정 로드 완료');
+        } catch (error) {
+            setStatus(`조회 실패: ${error.message || error}`, true);
+        }
+    }
+
+    function collectUpdates() {
+        const updates = {};
+        document.querySelectorAll('[data-key]').forEach((el) => {
+            const key = el.dataset.key;
+            const original = configState.values[key];
+
+            let next = el.value;
+            if (typeof original === 'boolean') {
+                next = String(next).toLowerCase() === 'true';
+            }
+
+            updates[key] = next;
+        });
+        return updates;
+    }
+
+    function collectLlmUpdates() {
+        const llmUpdates = {};
+        document.querySelectorAll('[data-llm-key]').forEach((el) => {
+            const key = el.dataset.llmKey;
+            let value = String(el.value || '').trim();
+
+            if (key === 'LLM_PROVIDER') {
+                value = value.toLowerCase();
+            }
+
+            // API 키는 빈 입력이면 기존 유지
+            if ((key === 'OPENAI_API_KEY' || key === 'GEMINI_API_KEY') && value === '') {
+                return;
+            }
+
+            llmUpdates[key] = value;
+        });
+        return llmUpdates;
+    }
+
+    function showToastPopup(message, options = {}) {
+        return new Promise((resolve) => {
+            const toast = document.getElementById('confirm-toast');
+            const msgEl = document.getElementById('confirm-toast-message');
+            const okBtn = document.getElementById('confirm-toast-ok');
+            const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+            if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                if (options.hideCancel) {
+                    window.alert(message);
+                    resolve(true);
+                } else {
+                    resolve(window.confirm(message));
+                }
+                return;
+            }
+
+            const confirmText = options.confirmText || '확인';
+            const cancelText = options.cancelText || '취소';
+            const hideCancel = !!options.hideCancel;
+
+            msgEl.textContent = message;
+            okBtn.textContent = confirmText;
+            cancelBtn.textContent = cancelText;
+            cancelBtn.style.display = hideCancel ? 'none' : 'inline-block';
+
+            toast.classList.add('show');
+
+            const cleanup = (result) => {
+                toast.classList.remove('show');
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                resolve(result);
+            };
+
+            okBtn.onclick = () => cleanup(true);
+            cancelBtn.onclick = () => cleanup(false);
+        });
+    }
+
+    async function showAlert(message) {
+        await showToastPopup(message, { hideCancel: true, confirmText: '확인' });
+    }
+
+    async function showConfirm(message, confirmText = '확인') {
+        return showToastPopup(message, { hideCancel: false, confirmText, cancelText: '취소' });
+    }
+
+    async function saveConfig() {
+        try {
+            const updates = collectUpdates();
+            const llmUpdates = collectLlmUpdates();
+            setStatus('설정 저장 중...');
+
+            const res = await fetch('/api/admin/config', {
+                method: 'POST',
+                headers: buildAdminHeaders(),
+                body: JSON.stringify({ updates, llm_updates: llmUpdates })
+            });
+            const data = await res.json();
+
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || '설정 저장 실패');
+            }
+
+            setStatus(data.message || '저장 완료');
+            await loadConfig();
+        } catch (error) {
+            setStatus(`저장 실패: ${error.message || error}`, true);
+        }
+    }
+
+    async function requestServerControl(action) {
+        const isRestart = action === 'restart';
+        const endpoint = isRestart ? '/api/admin/server/restart' : '/api/admin/server/shutdown';
+        const label = isRestart ? '재시작' : '종료';
+        const confirmText = isRestart
+            ? '서버를 재시작하시겠습니까?\n약 3~10초 동안 접속이 끊길 수 있습니다.'
+            : '서버를 종료하시겠습니까?\n종료 후에는 수동으로 다시 실행해야 합니다.';
+
+        const ok = await showConfirm(confirmText, label);
+        if (!ok) {
+            return;
+        }
+
+        try {
+            setStatus(`서버 ${label} 요청 중...`);
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: buildAdminHeaders()
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || `서버 ${label} 요청 실패`);
+            }
+
+            setStatus(data.message || `서버 ${label} 요청 완료`);
+            await showAlert(data.message || `서버 ${label} 요청이 처리되었습니다.`);
+        } catch (error) {
+            setStatus(`서버 ${label} 실패: ${error.message || error}`, true);
+            await showAlert(`서버 ${label} 실패: ${error.message || error}`);
+        }
+    }
+
+    async function logoutAdmin() {
+        const ok = await showConfirm('관리자 세션을 로그아웃하시겠습니까?', '로그아웃');
+        if (!ok) return;
+
+        try {
+            const res = await fetch('/api/admin/logout', {
+                method: 'POST',
+                headers: buildAdminHeaders(),
+                body: JSON.stringify({})
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || '로그아웃 실패');
+            }
+
+            try {
+                sessionStorage.removeItem('admin_csrf_token');
+                sessionStorage.removeItem('user_role');
+                sessionStorage.removeItem('user_id');
+            } catch (e) {}
+            location.href = '/login';
+        } catch (error) {
+            await showAlert(`로그아웃 실패: ${error.message || error}`);
+        }
+    }
+
+    window.onload = () => {
+        loadConfig();
+    };
+</script>
+    <!-- i18n Global Support -->
+    <link rel="stylesheet" href="/static/css/i18n-common.css">
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <!-- Global language FAB intentionally not included on this page -->
+<script>
+    (function () {
+        const root = document.documentElement;
+        function currentTheme() {
+            const t = root.getAttribute('data-theme');
+            return (t === 'dark' || t === 'light') ? t : 'light';
+        }
+        function themeModeText(mode) {
+            let lang = 'ko';
+            try {
+                const saved = localStorage.getItem('i18n_language') || localStorage.getItem('selectedLanguage') || document.documentElement.lang || 'ko';
+                lang = String(saved).slice(0, 2).toLowerCase();
+            } catch (e) {}
+            const map = {
+                ko: { dark: '다크 모드', light: '라이트 모드' },
+                en: { dark: 'Dark Mode', light: 'Light Mode' },
+                zh: { dark: '暗黑模式', light: '浅色模式' },
+                vi: { dark: 'Chế độ Tối', light: 'Chế độ Sáng' },
+                ru: { dark: 'Темный режим', light: 'Светлый режим' },
+                ja: { dark: 'ダークモード', light: 'ライトモード' }
+            };
+            const selected = map[lang] || map.ko;
+            return selected[mode] || map.ko[mode];
+        }
+        function applyTheme(theme, persist) {
+            root.setAttribute('data-theme', theme);
+            if (persist) {
+                try { localStorage.setItem('theme', theme); } catch (e) {}
+            }
+            const btn = document.getElementById('global-theme-toggle');
+            if (!btn) return;
+            const icon = btn.querySelector('[data-role="icon"]');
+            const label = btn.querySelector('[data-role="label"]');
+            if (theme === 'dark') {
+                if (icon) icon.textContent = '☀️';
+                if (label) label.textContent = themeModeText('light');
+            } else {
+                if (icon) icon.textContent = '🌙';
+                if (label) label.textContent = themeModeText('dark');
+            }
+        }
+        applyTheme(currentTheme(), false);
+    })();
+</script>
+<script src="/static/js/timeout.js"></script>
+</body>
+</html>

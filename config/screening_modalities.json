@@ -1,0 +1,33 @@
+{
+  "service_name": "종합 건강 스크리닝",
+  "version": 1,
+  "modalities": [
+    {
+      "id": "eye",
+      "label": "안구",
+      "short_description": "기존 안구 AI 분석",
+      "capture_label": "얼굴 및 안구 이미지",
+      "camera_role": "webcam",
+      "model_status": "ready",
+      "classes": ["Conjunctivitis", "Eyelid", "Cataract", "Normal", "Uveitis"]
+    },
+    {
+      "id": "skin",
+      "label": "피부",
+      "short_description": "피부 병변 이미지 스크리닝",
+      "capture_label": "피부 이미지",
+      "camera_role": "webcam",
+      "model_status": "not_configured",
+      "classes": ["ex1", "ex2"]
+    },
+    {
+      "id": "scalp",
+      "label": "두피",
+      "short_description": "두피 상태 이미지 스크리닝",
+      "capture_label": "두피 확대 이미지",
+      "camera_role": "usb_microscope",
+      "model_status": "not_configured",
+      "classes": ["ex1", "ex2"]
+    }
+  ]
+}

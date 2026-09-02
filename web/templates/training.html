@@ -1,0 +1,392 @@
+    <!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안구 건강 시력 회복 트레이닝 가이드</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --primary: #3182f6;
+            --primary-hover: #1b64da;
+            --bg: #f2f4f6;
+            --card: #ffffff;
+            --text: #191f28;
+            --text-muted: #4e5968;
+            --border: #dfe3ea;
+            --accent-bg: #f0fdf4;
+            --accent-text: #166534;
+            --teal-primary: #00897b;
+            --teal-light: #e0f2f1;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --primary-hover: #2b84ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent-bg: #14291a;
+            --accent-text: #34d399;
+            --teal-primary: #26a69a;
+            --teal-light: #0d2d2a;
+        }
+
+        [data-theme="dark"] .kiosk-window {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24), 0 20px 40px rgba(0, 0, 0, 0.36);
+        }
+
+        [data-theme="dark"] .header-section h1,
+        [data-theme="dark"] .card-title,
+        [data-theme="dark"] .btn-home,
+        [data-theme="dark"] .btn-youtube {
+            color: var(--text);
+        }
+
+        [data-theme="dark"] .training-card {
+            background: #111827;
+            border-color: #253042;
+        }
+
+        [data-theme="dark"] .training-card:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        }
+
+        [data-theme="dark"] .step-item {
+            background: #0f172a;
+            color: #e5e7eb;
+        }
+
+        [data-theme="dark"] .footer-section {
+            border-top-color: var(--border);
+        }
+
+        [data-theme="dark"] .btn-youtube {
+            box-shadow: 0 4px 12px rgba(255, 0, 0, 0.16);
+        }
+
+        [data-theme="dark"] .btn-home {
+            background: var(--primary);
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .btn-home:hover {
+            background: var(--primary-hover);
+        }
+
+        [data-theme="dark"] ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .kiosk-window {
+            width: 1240px;
+            height: 760px;
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.02), 0 16px 32px rgba(0, 0, 0, 0.04);
+            padding: 30px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 헤더 디자인 */
+        .header-section {
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .header-section h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0 0 6px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .header-section p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* 3열 대시보드 탭 레이아웃 */
+        .training-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+            margin-bottom: 20px;
+        }
+
+        .training-card {
+            background: var(--bg);
+            border-radius: 18px;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .training-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        .card-badge {
+            align-self: flex-start;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: var(--teal-light);
+            color: var(--teal-primary);
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 0 0 15px 0;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            flex: 1;
+        }
+
+        .step-item {
+            background: var(--card);
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            line-height: 1.4;
+            color: var(--text);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .step-num {
+            background: var(--teal-primary);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2px;
+        }
+
+        /* 하단 컨트롤러 영역 */
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+
+        .btn-youtube {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 52px;
+            padding: 0 24px;
+            background: #ff0000 !important;
+            color: #ffffff !important;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .btn-youtube:hover {
+            background: #cc0000 !important;
+            transform: translateY(-1px);
+        }
+
+        .btn-home {
+            height: 52px;
+            padding: 0 24px;
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-home:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        /* 스크롤바 정돈 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="kiosk-window">
+        <!-- 상단 헤더 타이틀 부 구역 -->
+        <div class="header-section">
+            <h1>📋 눈이 즉시 시원해지는 7가지 시력 회복 트레이닝</h1>
+            <p>AI 안구 분석 완료 후 일상에서 1분만 투자하여 시선 피로를 예방하고 안구 근육을 강화하는 홈 헬스케어 루틴입니다.</p>
+        </div>
+
+        <!-- 메인 3원색 구분형 트레이닝 대시보드 리스트 -->
+        <div class="training-grid">
+            
+            <!-- 1. 첫 번째 트레이닝 카드 -->
+            <div class="training-card">
+                <div class="card-badge">STEP 01</div>
+                <div class="card-title">🖐️ 활력 주입 부위 두드리기</div>
+                <ul class="step-list">
+                    <li class="step-item">
+                        <div class="step-num">1</div>
+                        <div><strong>눈 주변 마사지:</strong> 미간에서 관자놀이를 지나 눈 밑 앞부분을 따라 혈자리를 손끝으로 가볍게 5회 톡톡 두드립니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">2</div>
+                        <div><strong>눈 하단 자극:</strong> 눈동자 중심 기준 1cm 아래 안와 뼈 주위를 부드럽게 5회 터치하여 순환을 돕습니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">3</div>
+                        <div><strong>팔·다리 자극 연동:</strong> 팔 안쪽 손목선부터 팔꿈치, 다리 안쪽 복사뼈 부근을 왕복 10회씩 두드려 전신 순환 가이드라인을 연동합니다.</div>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 2. 두 번째 트레이닝 카드 -->
+            <div class="training-card">
+                <div class="card-badge">STEP 02</div>
+                <div class="card-title">🔄 얼굴 & 목 굳은 근육 흔들기</div>
+                <ul class="step-list">
+                    <li class="step-item">
+                        <div class="step-num">1</div>
+                        <div><strong>눈썹 이완:</strong> 눈썹 위 안쪽에 양손 가락을 대고 눈머리, 중앙, 눈꼬리 부분을 각 5회씩 원을 그리듯 상하좌우 부드럽게 흔듭니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">2</div>
+                        <div><strong>관자놀이 릴렉스:</strong> 눈꼬리에서 관자놀이까지 지긋이 누른 채 피부를 위아래로 가볍게 흔들어 눈 주변 긴장을 풀어줍니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">3</div>
+                        <div><strong>목·뒷덜미 마사지:</strong> 뒷목(경추)에 한쪽 손바닥을 가볍게 대고 상하좌우 각 5회씩 흔들어 시신경으로 가는 혈류를 개선합니다.</div>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 3. 세 번째 트레이닝 카드 -->
+            <div class="training-card">
+                <div class="card-badge">STEP 03</div>
+                <div class="card-title">✨ 상하 안구 꼼꼼히 문지르기</div>
+                <ul class="step-list">
+                    <li class="step-item">
+                        <div class="step-num">1</div>
+                        <div><strong>눈 위쪽 정돈:</strong> 눈썹 위 안쪽 눈구멍 뼈 가장자리를 따라 눈머리에서 눈꼬리 방향으로 가볍게 5회 쓸어 넘기듯 문지릅니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">2</div>
+                        <div><strong>눈 아래쪽 정돈:</strong> 눈 밑 안와 가장자리를 따라 눈머리에서 눈꼬리 방향까지 부드럽게 5회 밀어내며 마사지합니다.</div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-num">3</div>
+                        <div><strong>안점 압박 마감:</strong> 관자놀이를 가운뎃손가락으로 가볍고 깊숙하게 3초간 지긋이 누르며 트레이닝을 마칩니다.</div>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+
+        <!-- 하단 컨트롤러 및 유튜브 1:01 동기화 버튼 바 영역 -->
+        <div class="footer-section" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 20px;">
+            
+            <a href="https://www.youtube.com/watch?v=14i0PK4dEG4&t=61s" target="_blank" class="btn-youtube">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:middle;">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+                📺 시력 회복 유튜브 동영상 트레이닝 시작하기 (1분 1초로 바로가기)
+            </a>
+            
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-home" onclick="location.href='/report'" style="background: var(--border) !important; color: var(--text-muted) !important; font-weight: 600;">
+                    이전으로 (진단 결과지)
+                </button>
+                
+                <button class="action-primary btn-home" onclick="location.href='/'">
+                    🏠 처음 화면으로
+                </button>
+            </div>
+
+        </div>
+
+        <script src="/static/js/timeout.js"></script>
+    </div>
+
+
+</body>
+</html>

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <title>안구 건강 문진표 - AI 키오스크</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #1d1d1f;
+            --border: #d2d2d7;
+            --accent: #28cd41;
+            --safe-top: env(safe-area-inset-top, 0);
+            --safe-bottom: env(safe-area-inset-bottom, 0);
+            --safe-left: env(safe-area-inset-left, 0);
+            --safe-right: env(safe-area-inset-right, 0);
+            --fluid-padding: clamp(12px, 3vw, 24px);
+            --fluid-gap: clamp(12px, 2vw, 20px);
+            --fluid-radius: clamp(12px, 3vw, 20px);
+            --fluid-font: clamp(0.95rem, 2.2vw, 1.2rem);
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --border: #2a3240;
+            --accent: #34d399;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 4000;
+            display: none;
+        }
+
+        .confirm-toast.show { display: block; }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            /* 키오스크 규격 고정 및 중앙 정렬 */
+            width: 1240px; 
+            height: 760px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 { font-size: 1.8rem; color: var(--primary); margin: 0; }
+        p { margin: 5px 0; color: #86868b; }
+        [data-theme="dark"] p { color: #9aa3b2; }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            height: 82%;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow-y: auto;
+        }
+
+        h2 { font-size: 1.2rem; margin-bottom: 15px; border-left: 5px solid var(--primary); padding-left: 10px; }
+
+        /* 입력 폼 스타일 */
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: 600; font-size: 0.9rem; }
+        input, select, textarea {
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-size: 1rem;
+            background: #f9f9f9;
+        }
+        [data-theme="dark"] input,
+        [data-theme="dark"] select,
+        [data-theme="dark"] textarea {
+            background: #0f172a !important;
+            color: var(--text) !important;
+            border-color: #334155 !important;
+            -webkit-text-fill-color: var(--text);
+            caret-color: var(--text);
+            color-scheme: dark;
+        }
+
+        [data-theme="dark"] input:focus,
+        [data-theme="dark"] select:focus,
+        [data-theme="dark"] textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: #111827 !important;
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text);
+        }
+
+        [data-theme="dark"] input::placeholder,
+        [data-theme="dark"] textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] select option,
+        [data-theme="dark"] select optgroup {
+            background: #0f172a;
+            color: var(--text);
+        }
+
+        /* 필수 항목 표시 스타일 */
+        .required-mark {
+            color: #ff3b30;
+            margin-left: 3px;
+        }
+
+        /* 증상 체크 리스트 */
+        .symptom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .check-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f2f2f7;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        [data-theme="dark"] .check-item { background: #1f2937; }
+        [data-theme="dark"] .btn-prev { background: #334155; color: #e2e8f0; }
+
+        .check-item input { width: 20px; height: 20px; margin-right: 12px; }
+        .check-item:active { background: #e5e5ea; }
+
+        /* 하단 버튼 */
+        .footer-btns {
+            margin-top: auto;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            padding: 15px 50px;
+            border-radius: 15px;
+            border: none;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .btn:active { transform: scale(0.98); }
+        .btn-prev { background: #e5e5ea; color: #3a3a3c; text-decoration: none; display: inline-block; text-align: center; }
+        .btn-next { background: var(--primary); color: white; }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                padding: 12px;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+
+            header {
+                margin-bottom: 12px;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+
+            .main-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                gap: 12px;
+            }
+
+            .card {
+                padding: 14px;
+            }
+
+            .input-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .symptom-grid {
+                grid-template-columns: 1fr;
+            }
+
+            input, select, textarea {
+                min-height: 48px;
+                box-sizing: border-box;
+            }
+
+            .footer-btns {
+                flex-direction: column;
+                gap: 10px;
+                padding-bottom: 16px;
+            }
+
+            .btn {
+                width: 100%;
+                min-height: 48px;
+                padding: 12px 16px;
+                font-size: 1rem;
+                box-sizing: border-box;
+            }
+        }
+
+        @media screen and (max-width: 520px) {
+            body {
+                padding-top: max(var(--safe-top), 10px);
+                padding-bottom: max(var(--safe-bottom), 10px);
+                padding-left: max(var(--safe-left), 10px);
+                padding-right: max(var(--safe-right), 10px);
+            }
+
+            h1 {
+                font-size: clamp(1.2rem, 5vw, 1.4rem);
+            }
+
+            p {
+                font-size: clamp(0.85rem, 3vw, 0.95rem);
+            }
+
+            .card {
+                padding: 14px;
+                border-radius: var(--fluid-radius);
+            }
+
+            .input-row,
+            .symptom-grid {
+                gap: 10px;
+            }
+
+            .field {
+                gap: 4px;
+            }
+
+            label {
+                font-size: 0.88rem;
+            }
+
+            input,
+            select,
+            textarea {
+                min-height: 44px;
+                padding: 12px;
+                font-size: 0.95rem;
+            }
+
+            textarea {
+                min-height: 90px;
+            }
+
+            .check-item {
+                padding: 10px;
+                font-size: 0.95rem;
+            }
+
+            .footer-btns {
+                gap: 10px;
+                padding-bottom: 12px;
+            }
+
+            .btn {
+                padding: 12px 14px;
+                font-size: 0.98rem;
+            }
+        }
+
+        @media screen and (max-width: 400px) {
+            .main-container {
+                gap: 8px;
+            }
+
+            .input-row,
+            .symptom-grid {
+                gap: 8px;
+            }
+
+            .check-item {
+                font-size: 0.92rem;
+                padding: 9px;
+            }
+
+            .btn {
+                padding: 11px 12px;
+                font-size: 0.95rem;
+            }
+
+            .confirm-toast {
+                width: min(94vw, 340px);
+                top: calc(max(var(--safe-top), 12px) + 10px);
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 data-i18n="survey_title">📋 안구 건강 정밀 문진</h1>
+        <p data-i18n="survey_instruction">정확한 AI 분석을 위해 현재 상태를 솔직하게 답변해 주세요.</p>
+    </header>
+
+    <div class="main-container">
+        <div class="card">
+            <h2>👤 기본 정보</h2>
+            <div class="input-row">
+                <div class="field">
+                    <label data-i18n="label_age">나이<span class="required-mark">*</span></label>
+                    <input type="number" id="user-age" placeholder="세" required min="1" max="120">
+                </div>
+                <div class="field">
+                    <label data-i18n="label_gender">성별</label>
+                    <select id="user-gender">
+                        <option value="남성">남성</option>
+                        <option value="여성">여성</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field" style="margin-bottom:15px;">
+                <label data-i18n="label_wearing_glasses">안경/렌즈 착용 유무</label>
+                <select id="user-wearing">
+                    <option value="미착용">미착용</option>
+                    <option value="안경 착용">안경 착용</option>
+                    <option value="콘택트렌즈 착용">콘택트렌즈 착용</option>
+                </select>
+            </div>
+
+            <div class="field" style="margin-bottom:15px;">
+                <label data-i18n="label_vision_correction">현재 교정시력 (선택)</label>
+                <div class="input-row">
+                    <div class="field">
+                        <label data-i18n="label_vision_left">좌안(L)</label>
+                        <input type="number" id="vision-left" step="0.1" min="0" max="3.0" placeholder="예: 1.0">
+                    </div>
+                    <div class="field">
+                        <label data-i18n="label_vision_right">우안(R)</label>
+                        <input type="number" id="vision-right" step="0.1" min="0" max="3.0" placeholder="예: 1.0">
+                    </div>
+                </div>
+            </div>
+
+            <h2>🏥 병력 및 생활 습관</h2>
+            <div class="field" style="margin-bottom:10px;">
+                <label data-i18n="label_conditions">기저질환 (당뇨, 고혈압 등)</label>
+                <textarea id="user-conditions" rows="2" placeholder="예: 당뇨(5년차), 고혈압 약 복용 중"></textarea>
+            </div>
+            <div class="field" style="margin-bottom:10px;">
+                <label data-i18n="label_surgery_history">안구 수술 이력</label>
+                <input id="user-surgery" type="text" placeholder="수술명 및 시기 작성">
+            </div>
+            <div class="input-row">
+                <div class="field">
+                    <label data-i18n="label_smoking">흡연 유무</label>
+                    <select id="user-smoking"><option value="비흡연">비흡연</option><option value="흡연">흡연</option></select>
+                </div>
+                <div class="field">
+                    <label data-i18n="label_drinking">음주 빈도</label>
+                    <select id="user-drinking"><option value="안함">안함</option><option value="가끔">가끔</option><option value="자주">자주</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>👁️ 현재 안구 증상 (해당되는 항목 모두 체크)</h2>
+            <div class="symptom-grid">
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="시력이 예전보다 잘 안 보임"> 시력이 예전보다 잘 안 보임</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="사물이 흐리거나 흔들려 보임"> 사물이 흐리거나 흔들려 보임</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="선이나 사물이 휘어 보임"> 선이나 사물이 휘어 보임</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="사물이 겹쳐서(둘로) 보임"> 사물이 겹쳐서(둘로) 보임</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="눈앞에 벌레 같은 게 떠다님"> 눈앞에 벌레 같은 게 떠다님</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="시야의 일부가 가려져 보임"> 시야의 일부가 가려져 보임</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="눈이 시리고 통증이 느껴짐"> 눈이 시리고 통증이 느껴짐</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="눈이 너무 건조하고 뻑뻑함"> 눈이 너무 건조하고 뻑뻑함</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="이유 없이 눈물이 자주 남"> 이유 없이 눈물이 자주 남</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="눈이 가렵거나 자주 충혈됨"> 눈이 가렵거나 자주 충혈됨</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="자고 나면 눈꼽이 많이 생김"> 자고 나면 눈꼽이 많이 생김</label>
+                <label class="check-item"><input type="checkbox" class="symptom-check" value="빛이 번져 보이거나 눈부심이 심함"> 빛이 번져 보이거나 눈부심이 심함</label>
+            </div>
+            
+            <div class="field" style="margin-top:20px;">
+                <label data-i18n="label_other_notes">기타 불편한 점</label>
+                <textarea id="user-other-notes" rows="2" placeholder="위 항목 외에 불편한 점이 있다면 적어주세요."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-btns">
+        <button class="btn btn-prev" onclick="location.href='login.html'">이전으로 (본인인증)</button>
+        <button class="btn btn-next" onclick="submitSurvey()">문진 완료 및 AI 검사 시작</button>
+    </div>
+
+    <div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+        <div id="confirm-toast-message" class="confirm-toast-message"></div>
+        <div class="confirm-toast-actions">
+            <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel">취소</button>
+            <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">확인</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const root = document.documentElement;
+            function currentTheme() {
+                const t = root.getAttribute('data-theme');
+                return (t === 'dark' || t === 'light') ? t : 'light';
+            }
+            function applyTheme(theme, persist) {
+                root.setAttribute('data-theme', theme);
+                if (persist) {
+                    try { localStorage.setItem('theme', theme); } catch (e) {}
+                }
+                const btn = document.getElementById('global-theme-toggle');
+                if (!btn) return;
+                const icon = btn.querySelector('[data-role="icon"]');
+                const label = btn.querySelector('[data-role="label"]');
+                if (theme === 'dark') {
+                    if (icon) icon.textContent = '☀️';
+                    if (label) label.textContent = '라이트 모드';
+                } else {
+                    if (icon) icon.textContent = '🌙';
+                    if (label) label.textContent = '다크 모드';
+                }
+            }
+            applyTheme(currentTheme(), false);
+        })();
+    </script>
+
+    <script>
+        function showToastPopup(message, options = {}) {
+            return new Promise((resolve) => {
+                const toast = document.getElementById('confirm-toast');
+                const msgEl = document.getElementById('confirm-toast-message');
+                const okBtn = document.getElementById('confirm-toast-ok');
+                const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+                if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                    if (options.hideCancel) {
+                        window.alert(message);
+                        resolve(true);
+                    } else {
+                        resolve(window.confirm(message));
+                    }
+                    return;
+                }
+
+                const confirmText = options.confirmText || '확인';
+                const cancelText = options.cancelText || '취소';
+                const hideCancel = !!options.hideCancel;
+
+                msgEl.textContent = message;
+                okBtn.textContent = confirmText;
+                cancelBtn.textContent = cancelText;
+                cancelBtn.style.display = hideCancel ? 'none' : 'inline-block';
+
+                toast.classList.add('show');
+
+                const cleanup = (result) => {
+                    toast.classList.remove('show');
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    resolve(result);
+                };
+
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+            });
+        }
+
+        async function showAlert(message) {
+            await showToastPopup(message, { hideCancel: true, confirmText: '확인' });
+        }
+
+        async function showConfirm(message, confirmText = '확인') {
+            return showToastPopup(message, { hideCancel: false, confirmText, cancelText: '취소' });
+        }
+
+        function readSessionValue(key) {
+            const current = sessionStorage.getItem(key);
+            if (current !== null) return current;
+
+            const legacy = localStorage.getItem(key);
+            if (legacy !== null) {
+                sessionStorage.setItem(key, legacy);
+                localStorage.removeItem(key);
+            }
+            return legacy;
+        }
+
+        async function submitSurvey() {
+            const ageInput = document.getElementById('user-age');
+            const userId = (readSessionValue('user_id') || '').trim();
+            
+            // 나이 입력 여부 검사
+            if (!ageInput.value) {
+                await showAlert("정확한 분석을 위해 나이를 입력해 주세요.");
+                ageInput.focus();
+                return;
+            }
+
+            if (!userId) {
+                await showAlert("사용자 인증 정보가 없습니다. 다시 로그인해 주세요.");
+                location.href = '/login';
+                return;
+            }
+
+            const ok = await showConfirm("문진 내용을 저장하고 AI 검사 단계로 이동하시겠습니까?", '이동');
+            if (ok) {
+                const surveyPayload = {
+                    age: ageInput.value,
+                    gender: document.getElementById('user-gender').value,
+                    wearing: document.getElementById('user-wearing').value,
+                    vision_left: document.getElementById('vision-left').value,
+                    vision_right: document.getElementById('vision-right').value,
+                    conditions: document.getElementById('user-conditions').value,
+                    surgery_history: document.getElementById('user-surgery').value,
+                    smoking: document.getElementById('user-smoking').value,
+                    drinking: document.getElementById('user-drinking').value,
+                    symptoms: Array.from(document.querySelectorAll('.symptom-check:checked')).map(el => el.value),
+                    other_notes: document.getElementById('user-other-notes').value
+                };
+
+                try {
+                    const res = await fetch('/api/survey', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            survey: surveyPayload
+                        })
+                    });
+
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || data.status !== 'ok') {
+                        throw new Error(data.message || '문진 저장 실패');
+                    }
+
+                    // 결과 리포트 표시용 로컬 저장
+                    sessionStorage.setItem('user_age', String(surveyPayload.age));
+                    localStorage.removeItem('user_age');
+                    location.href = '/capture';
+                } catch (error) {
+                    await showAlert(`문진 저장에 실패했습니다.\n${error.message || error}`);
+                }
+            }
+        }
+    </script>
+    <script src="/static/js/timeout.js"></script>
+</body>
+</html>

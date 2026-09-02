@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안구 건강 종합 리포트 - 출력</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --navy: #12324f;
+            --navy-dark: #0b1f33;
+            --teal: #2ca6a4;
+            --mint: #dff6f4;
+            --amber: #f4b740;
+            --coral: #e86f61;
+            --page-bg-start: #eef4f9;
+            --page-bg-end: #f7fafc;
+            --page-bg-accent-1: rgba(18, 50, 79, 0.10);
+            --page-bg-accent-2: rgba(44, 166, 164, 0.12);
+            --surface: #ffffff;
+            --surface-soft: #f8fbff;
+            --surface-muted: #fbfdff;
+            --surface-elevated: #eef6fb;
+            --surface-strong: #e2e8f0;
+            --border: #dbe5ef;
+            --border-strong: #dce6ef;
+            --text-strong: #1f2937;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --line: #d8e0e8;
+            --panel: #f7fafc;
+            --bg: #eef4f9;
+            --shadow: 0 16px 46px rgba(15, 23, 42, 0.10);
+            --status-normal-bg: #e6faf7;
+            --status-normal-text: #0f766e;
+            --status-warning-bg: #fff3dc;
+            --status-warning-text: #b45309;
+            --status-danger-bg: #fee4e2;
+            --status-danger-text: #b42318;
+        }
+
+        [data-theme="dark"] {
+            --navy: #8db4ff;
+            --navy-dark: #cfe0ff;
+            --page-bg-start: #0f172a;
+            --page-bg-end: #111827;
+            --page-bg-accent-1: rgba(78, 161, 255, 0.12);
+            --page-bg-accent-2: rgba(52, 211, 153, 0.10);
+            --surface: #161a22;
+            --surface-soft: #111827;
+            --surface-muted: #0f172a;
+            --surface-elevated: #1f2937;
+            --surface-strong: #334155;
+            --border: #2a3240;
+            --border-strong: #334155;
+            --text-strong: #f8fafc;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --line: #2a3240;
+            --panel: #161a22;
+            --shadow: 0 18px 54px rgba(0, 0, 0, 0.45);
+            --status-normal-bg: #0f2f2a;
+            --status-normal-text: #6ee7d8;
+            --status-warning-bg: #3a2a10;
+            --status-warning-text: #fbbf24;
+            --status-danger-bg: #3a1714;
+            --status-danger-text: #fca5a5;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background:
+                radial-gradient(circle at top left, var(--page-bg-accent-1), transparent 28%),
+                radial-gradient(circle at top right, var(--page-bg-accent-2), transparent 24%),
+                linear-gradient(180deg, var(--page-bg-start) 0%, var(--page-bg-end) 100%);
+            color: var(--text);
+            font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            word-break: keep-all;
+            overflow-wrap: anywhere;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 18px;
+        }
+
+        .shell {
+            width: min(100%, 210mm);
+            margin: 0 auto;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            min-height: 44px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+            letter-spacing: -0.2px;
+        }
+
+        .btn-back { background: var(--surface-strong); color: #1e293b; }
+        .btn-print { background: var(--navy); color: white; }
+
+        .paper {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            box-shadow: var(--shadow);
+            padding: 18px;
+        }
+
+        .header {
+            border-radius: 18px;
+            border: 1px solid var(--border-strong);
+            background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+            padding: 16px;
+            border-top: 5px solid var(--navy);
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+
+        .brand {
+            display: grid;
+            gap: 4px;
+        }
+
+        .kicker {
+            color: var(--navy);
+            font-size: 9pt;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 20pt;
+            line-height: 1.15;
+            color: var(--navy);
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 10pt;
+        }
+
+        .badge {
+            border: 1px solid var(--border-strong);
+            background: var(--surface-elevated);
+            color: var(--navy);
+            border-radius: 999px;
+            font-size: 8.8pt;
+            font-weight: 800;
+            padding: 5px 10px;
+            white-space: nowrap;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0;
+            border-top: 1px solid var(--border-strong);
+            background: var(--surface-muted);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .meta {
+            padding: 10px 12px;
+            min-height: 56px;
+            border-right: 1px solid var(--border-strong);
+        }
+
+        .meta:last-child { border-right: none; }
+
+        .meta-label {
+            display: block;
+            font-size: 8.8pt;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .meta-value {
+            font-size: 11pt;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .section {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            background: var(--surface);
+            margin-top: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: linear-gradient(90deg, rgba(18,50,79,0.08), rgba(44,166,164,0.09));
+            border-bottom: 1px solid var(--border);
+            color: var(--navy);
+            font-size: 11pt;
+            font-weight: 900;
+        }
+
+        .chip {
+            font-size: 8.5pt;
+            font-weight: 800;
+            color: var(--navy);
+            border: 1px solid var(--border-strong);
+            background: var(--surface-elevated);
+            border-radius: 999px;
+            padding: 4px 8px;
+            white-space: nowrap;
+        }
+
+        .section-body { padding: 14px; }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 12px;
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface-muted);
+            padding: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .card h3 {
+            margin: 0 0 8px;
+            font-size: 10.5pt;
+            color: var(--navy);
+        }
+
+        .kv-grid {
+            display: grid;
+            grid-template-columns: 94px 1fr;
+            gap: 8px 10px;
+            font-size: 9.8pt;
+        }
+
+        .kv-key { color: var(--muted); font-weight: 700; }
+        .kv-value { color: var(--text); font-weight: 700; }
+
+        .symptom-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .symptom-pill {
+            border: 1px solid var(--border-strong);
+            border-radius: 999px;
+            padding: 6px 10px;
+            background: var(--surface);
+            font-size: 9pt;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .eye-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .eye-card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            background: var(--surface);
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .eye-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--surface-soft);
+            border-bottom: 1px solid var(--border);
+            font-size: 9.6pt;
+            font-weight: 800;
+            color: var(--navy);
+        }
+
+        .eye-label {
+            font-size: 8.5pt;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: var(--mint);
+            color: #0f766e;
+            border: 1px solid #bfe7e3;
+            white-space: nowrap;
+        }
+
+        .eye-wrap {
+            padding: 10px;
+            background: var(--surface-soft);
+        }
+
+        .eye-image {
+            display: block;
+            width: 100%;
+            height: 178px;
+            object-fit: cover;
+            border-radius: 12px;
+            background: #0f172a;
+        }
+
+        .eye-caption {
+            padding: 0 10px 10px;
+            font-size: 8.8pt;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        .severity-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5pt;
+        }
+
+        .severity-table th,
+        .severity-table td {
+            border-bottom: 1px solid var(--border);
+            padding: 8px 8px;
+            vertical-align: middle;
+            text-align: left;
+        }
+
+        .severity-table th {
+            background: var(--surface-soft);
+            color: var(--navy);
+            font-size: 9pt;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 8.6pt;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .status-normal { color: var(--status-normal-text); background: var(--status-normal-bg); }
+        .status-warning { color: var(--status-warning-text); background: var(--status-warning-bg); }
+        .status-danger { color: var(--status-danger-text); background: var(--status-danger-bg); }
+
+        .meter {
+            width: 100%;
+            height: 10px;
+            background: var(--surface-elevated);
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid var(--border-strong);
+        }
+
+        .meter-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--teal), var(--amber), var(--coral));
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .guide-card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface-muted);
+            padding: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .guide-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: var(--navy);
+            font-size: 10pt;
+            font-weight: 900;
+        }
+
+        .guide-summary {
+            color: var(--text-strong);
+            font-size: 9.8pt;
+            line-height: 1.55;
+        }
+
+        .mini-list {
+            margin: 8px 0 0;
+            padding-left: 18px;
+            color: #334155;
+            font-size: 9.2pt;
+            line-height: 1.5;
+        }
+
+        .main-box {
+            margin-top: 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface);
+            padding: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .main-box-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: var(--navy);
+            font-size: 10pt;
+            font-weight: 900;
+        }
+
+        .guide-bullets {
+            margin: 0;
+            padding-left: 18px;
+            color: #334155;
+            font-size: 9.6pt;
+            line-height: 1.55;
+        }
+
+        .footer {
+            margin-top: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+
+        .disclaimer {
+            border: 1px solid var(--border-strong);
+            background: var(--surface-soft);
+            border-radius: 12px;
+            padding: 10px 12px;
+            color: #526273;
+            font-size: 8.8pt;
+            line-height: 1.5;
+        }
+
+        .signature-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            color: var(--text-strong);
+            font-size: 10pt;
+            font-weight: 700;
+        }
+
+        .signature-line {
+            display: inline-block;
+            min-width: 180px;
+            border-bottom: 1px solid var(--border-strong);
+            transform: translateY(-2px);
+        }
+
+        .empty-state {
+            color: var(--muted);
+            font-size: 9.5pt;
+        }
+
+        @media print {
+            body { background: #fff !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .shell { width: 100% !important; margin: 0 !important; }
+            .paper { border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }
+            .header,
+            .section,
+            .eye-card,
+            .guide-card,
+            .main-box,
+            .card { break-inside: avoid; page-break-inside: avoid; }
+        }
+
+        [data-theme="dark"] .paper,
+        [data-theme="dark"] .header,
+        [data-theme="dark"] .section,
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .eye-card,
+        [data-theme="dark"] .guide-card,
+        [data-theme="dark"] .main-box {
+            background: var(--surface);
+        }
+
+        [data-theme="dark"] .subtitle,
+        [data-theme="dark"] .empty-state,
+        [data-theme="dark"] .eye-caption,
+        [data-theme="dark"] .disclaimer,
+        [data-theme="dark"] .mini-list,
+        [data-theme="dark"] .guide-bullets,
+        [data-theme="dark"] .guide-summary,
+        [data-theme="dark"] .kv-key,
+        [data-theme="dark"] .meta-label,
+        [data-theme="dark"] .signature-row {
+            color: #cbd5e1;
+        }
+
+        [data-theme="dark"] .btn-back {
+            background: var(--surface-strong);
+            color: #e5e7eb;
+        }
+
+        [data-theme="dark"] .btn-print {
+            background: #334155;
+            color: #e5e7eb;
+        }
+
+        [data-theme="dark"] .badge,
+        [data-theme="dark"] .chip,
+        [data-theme="dark"] .symptom-pill {
+            background: var(--surface-muted);
+            color: #dbeafe;
+            border-color: var(--border-strong);
+        }
+
+        [data-theme="dark"] .section-title,
+        [data-theme="dark"] .eye-head,
+        [data-theme="dark"] .severity-table th {
+            background: var(--surface-soft);
+        }
+
+        [data-theme="dark"] .severity-table td,
+        [data-theme="dark"] .severity-table th,
+        [data-theme="dark"] .meta,
+        [data-theme="dark"] .meta-grid,
+        [data-theme="dark"] .header,
+        [data-theme="dark"] .section,
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .eye-card,
+        [data-theme="dark"] .guide-card,
+        [data-theme="dark"] .main-box,
+        [data-theme="dark"] .footer {
+            border-color: var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="toolbar no-print">
+            <button class="btn btn-back" onclick="location.href='/report'">리포트로 돌아가기</button>
+            <button class="btn btn-print" onclick="window.print()">출력</button>
+        </div>
+
+        <article class="paper" id="paper">
+            <div class="header">
+                <div class="header-top">
+                    <div class="brand">
+                        <div class="kicker">Smart Eye Diagnosis System</div>
+                        <h1 class="title">안구 건강 종합 리포트</h1>
+                        <p class="subtitle">의료 보조용 AI 분석 결과 · 브라우저 출력 최적화 보고서</p>
+                    </div>
+                    <div class="badge" id="overall-badge">AI 분석 대기</div>
+                </div>
+                <div class="meta-grid">
+                    <div class="meta">
+                        <span class="meta-label">환자 / 사용자 ID</span>
+                        <div class="meta-value" id="user-id">-</div>
+                    </div>
+                    <div class="meta">
+                        <span class="meta-label">검사 일시</span>
+                        <div class="meta-value" id="inspection-time">-</div>
+                    </div>
+                    <div class="meta">
+                        <span class="meta-label">판독 상태</span>
+                        <div class="meta-value" id="overall-status">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <section class="section">
+                <div class="section-title">
+                    <span>1. Patient Info</span>
+                    <span class="chip">Basic Profile</span>
+                </div>
+                <div class="section-body">
+                    <div class="info-grid">
+                        <div class="card">
+                            <h3>기본 정보</h3>
+                            <div class="kv-grid">
+                                <div class="kv-key">연령</div><div class="kv-value" id="age">-</div>
+                                <div class="kv-key">성별</div><div class="kv-value" id="gender">-</div>
+                                <div class="kv-key">검사 형태</div><div class="kv-value">Eye Screening</div>
+                                <div class="kv-key">분석 기준</div><div class="kv-value">AI + YOLO BBox</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>주요 증상 체크</h3>
+                            <div id="symptoms" class="symptom-list"><span class="symptom-pill">설문 정보 없음</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-title">
+                    <span>2. Deep Learning Image Results</span>
+                    <span class="chip">YOLO BBox + Eye Crop</span>
+                </div>
+                <div class="section-body">
+                    <div class="eye-grid">
+                        <article class="eye-card">
+                            <div class="eye-head">
+                                <span>좌안 / Left Eye</span>
+                                <span class="eye-label" id="left-badge">[좌안] 원본 및 관심영역 추출 완료</span>
+                            </div>
+                            <div class="eye-wrap">
+                                <img id="left-image" class="eye-image" alt="Left eye crop" src="https://via.placeholder.com/640x360/e2e8f0/64748b?text=Left+Eye" />
+                            </div>
+                            <div class="eye-caption" id="left-caption">Confidence: - · BBox 추출 결과 기반</div>
+                        </article>
+                        <article class="eye-card">
+                            <div class="eye-head">
+                                <span>우안 / Right Eye</span>
+                                <span class="eye-label" id="right-badge">[우안] 원본 및 관심영역 추출 완료</span>
+                            </div>
+                            <div class="eye-wrap">
+                                <img id="right-image" class="eye-image" alt="Right eye crop" src="https://via.placeholder.com/640x360/e2e8f0/64748b?text=Right+Eye" />
+                            </div>
+                            <div class="eye-caption" id="right-caption">Confidence: - · BBox 추출 결과 기반</div>
+                        </article>
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <table class="severity-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 18%">Eye</th>
+                                    <th style="width: 20%">Disease Class</th>
+                                    <th style="width: 18%">Status</th>
+                                    <th style="width: 22%">Gauge</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody id="severity-body">
+                                <tr><td colspan="5" class="empty-state">분석 데이터를 불러오는 중...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-title">
+                    <span>3. AI/LLM Comprehensive Diagnosis Guide</span>
+                    <span class="chip">Clinical Guide</span>
+                </div>
+                <div class="section-body">
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <div class="guide-head">
+                                <span>Left Eye Guidance</span>
+                                <span id="left-status" class="status-pill status-normal">정상</span>
+                            </div>
+                            <div id="left-summary" class="guide-summary">분석 대기</div>
+                            <ul id="left-bullets" class="mini-list"></ul>
+                        </article>
+                        <article class="guide-card">
+                            <div class="guide-head">
+                                <span>Right Eye Guidance</span>
+                                <span id="right-status" class="status-pill status-normal">정상</span>
+                            </div>
+                            <div id="right-summary" class="guide-summary">분석 대기</div>
+                            <ul id="right-bullets" class="mini-list"></ul>
+                        </article>
+                    </div>
+
+                    <div class="main-box">
+                        <div class="main-box-head">
+                            <span>Overall Summary</span>
+                            <span id="overall-tag" class="status-pill status-normal">정상</span>
+                        </div>
+                        <div id="overall-summary" class="guide-summary">분석 데이터가 준비되면 종합 소견이 표시됩니다.</div>
+                        <ul id="overall-departments" class="guide-bullets" style="margin-top:10px;"></ul>
+                        <ul id="overall-care" class="guide-bullets"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="footer">
+                <div class="disclaimer">본 결과는 AI 딥러닝 모델의 분석 데이터 기반 보조 지표로, 정확한 임상 진단은 반드시 안과 전문의의 진료를 요합니다.</div>
+                <div class="signature-row">검사자: <span class="signature-line"></span> (인)</div>
+            </footer>
+        </article>
+    </div>
+
+    <script>
+        const state = {
+            userId: 'anonymous',
+            historyRecords: [],
+            historySessions: [],
+            survey: null,
+            latestSession: null
+        };
+
+        function readSessionValue(key) {
+            const current = sessionStorage.getItem(key);
+            if (current !== null) return current;
+
+            const legacy = localStorage.getItem(key);
+            if (legacy !== null) {
+                sessionStorage.setItem(key, legacy);
+                localStorage.removeItem(key);
+            }
+            return legacy;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatShortDateTime(createdAt) {
+            if (!createdAt) return '-';
+            const [datePart, timePart = ''] = String(createdAt).split(' ');
+            const shortDate = datePart.replace(/-/g, '.').slice(2);
+            const shortTime = timePart.slice(0, 5);
+            return `${shortDate} ${shortTime}`.trim();
+        }
+
+        function normalizeSurveyValue(value, fallback = '-') {
+            const text = String(value ?? '').trim();
+            return text ? text : fallback;
+        }
+
+        function normalizeSurveySymptoms(survey) {
+            return Array.isArray(survey?.symptoms) ? survey.symptoms.filter(Boolean) : [];
+        }
+
+        function hasLeftEye(record) {
+            return !!record?.analysis?.left_eye;
+        }
+
+        function hasRightEye(record) {
+            return !!record?.analysis?.right_eye;
+        }
+
+        function isComplementaryPair(recordA, recordB) {
+            const aL = hasLeftEye(recordA);
+            const aR = hasRightEye(recordA);
+            const bL = hasLeftEye(recordB);
+            const bR = hasRightEye(recordB);
+            return (aL && !aR && !bL && bR) || (!aL && aR && bL && !bR);
+        }
+
+        function addRecordEyesToSession(session, record) {
+            const analysis = record?.analysis || {};
+
+            if (!session.eyes.L && analysis.left_eye) {
+                session.eyes.L = {
+                    image_url: record.image_url,
+                    bbox: analysis.left_eye.bbox || null,
+                    record
+                };
+            }
+            if (!session.eyes.R && analysis.right_eye) {
+                session.eyes.R = {
+                    image_url: record.image_url,
+                    bbox: analysis.right_eye.bbox || null,
+                    record
+                };
+            }
+
+            session.analysis = mergeAnalyses(session.analysis, analysis);
+            session.records.push(record);
+        }
+
+        function mergeAnalyses(baseAnalysis, nextAnalysis) {
+            const base = baseAnalysis || {};
+            const next = nextAnalysis || {};
+            return {
+                ...base,
+                ...next,
+                left_eye: base.left_eye || next.left_eye || null,
+                right_eye: base.right_eye || next.right_eye || null,
+                guide: base.guide || next.guide || null
+            };
+        }
+
+        function makeSessionFromRecord(record) {
+            const session = {
+                created_at: record?.created_at || null,
+                records: [],
+                analysis: {},
+                eyes: { L: null, R: null }
+            };
+            addRecordEyesToSession(session, record);
+            return session;
+        }
+
+        function buildHistorySessions(records) {
+            const sessions = [];
+            const maxMergeGapMs = 3 * 60 * 1000;
+
+            for (let index = 0; index < records.length; index += 1) {
+                const record = records[index];
+                if (!hasLeftEye(record) && !hasRightEye(record)) continue;
+
+                const session = makeSessionFromRecord(record);
+                const hasBothInCurrentRecord = hasLeftEye(record) && hasRightEye(record);
+                if (!hasBothInCurrentRecord && index + 1 < records.length) {
+                    const next = records[index + 1];
+                    const timeGap = Math.abs(Date.parse(String(record.created_at).replace(' ', 'T')) - Date.parse(String(next.created_at).replace(' ', 'T')));
+                    if (Number.isFinite(timeGap) && timeGap <= maxMergeGapMs && isComplementaryPair(record, next)) {
+                        addRecordEyesToSession(session, next);
+                        index += 1;
+                    }
+                }
+
+                sessions.push(session);
+            }
+
+            return sessions;
+        }
+
+        function getEyeBBox(analysis, side) {
+            const eye = side === 'L' ? (analysis?.left_eye || null) : (analysis?.right_eye || null);
+            const bbox = eye?.bbox;
+            if (!Array.isArray(bbox) || bbox.length !== 4) return null;
+            const nums = bbox.map(value => Number(value));
+            if (nums.some(value => !Number.isFinite(value))) return null;
+            return nums;
+        }
+
+        function buildCroppedEyeDataUrl(imageUrl, bbox) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => {
+                    const [x1, y1, x2, y2] = bbox;
+                    const ix1 = Math.max(0, Math.floor(Math.min(x1, x2)));
+                    const iy1 = Math.max(0, Math.floor(Math.min(y1, y2)));
+                    const ix2 = Math.min(image.width, Math.ceil(Math.max(x1, x2)));
+                    const iy2 = Math.min(image.height, Math.ceil(Math.max(y1, y2)));
+                    const cropW = Math.max(1, ix2 - ix1);
+                    const cropH = Math.max(1, iy2 - iy1);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = cropW;
+                    canvas.height = cropH;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, ix1, iy1, cropW, cropH, 0, 0, cropW, cropH);
+                    resolve(canvas.toDataURL('image/jpeg', 0.92));
+                };
+                image.onerror = reject;
+                image.src = imageUrl;
+            });
+        }
+
+        async function resolveSessionEyeImage(session, side) {
+            if (!session) return '';
+            const eye = side === 'L' ? session.eyes.L : session.eyes.R;
+            if (!eye || !eye.image_url) return '';
+
+            const bbox = eye.bbox && Array.isArray(eye.bbox) && eye.bbox.length === 4 ? eye.bbox : null;
+            if (bbox) {
+                try {
+                    return await buildCroppedEyeDataUrl(eye.image_url, bbox);
+                } catch (error) {
+                    return eye.image_url;
+                }
+            }
+            return eye.image_url;
+        }
+
+        function getPrintableStatusMeta(eyeData) {
+            const disease = String(eyeData?.disease || '분석 정보 없음');
+            const confidence = Number(eyeData?.confidence || 0);
+            const normalized = /정상|normal|일반/i.test(disease);
+
+            if (normalized) {
+                return { label: '정상', className: 'status-normal', confidence, disease, meter: Math.max(8, Math.min(100, confidence || 28)) };
+            }
+            if (confidence >= 80) {
+                return { label: '정밀검사 필요', className: 'status-danger', confidence, disease, meter: Math.max(70, Math.min(100, confidence)) };
+            }
+            if (confidence >= 60) {
+                return { label: '의심', className: 'status-warning', confidence, disease, meter: Math.max(50, Math.min(90, confidence)) };
+            }
+            return { label: '정상', className: 'status-normal', confidence, disease, meter: Math.max(10, Math.min(60, confidence || 22)) };
+        }
+
+        function buildPrintableGuide(analysis) {
+            const guide = analysis && analysis.guide ? analysis.guide : null;
+            if (guide) return guide;
+
+            const left = analysis?.left_eye || {};
+            const right = analysis?.right_eye || {};
+            const candidates = [];
+            if (left.disease) candidates.push({ side: 'left', disease: left.disease, confidence: Number(left.confidence || 0) });
+            if (right.disease) candidates.push({ side: 'right', disease: right.disease, confidence: Number(right.confidence || 0) });
+
+            if (!candidates.length) {
+                return {
+                    risk_level: 'safe',
+                    tag_text: '안내: 유효한 분석 데이터 없음',
+                    summary: '눈 영역 분석 데이터가 부족합니다. 조명을 보강하고 다시 촬영해 주세요.',
+                    recommended_departments: ['일반 안과'],
+                    daily_care: [
+                        '촬영 시 정면 응시 및 충분한 조명을 확보하세요.',
+                        '눈 자극(손 비비기, 렌즈 장시간 착용)을 피하세요.'
+                    ]
+                };
+            }
+
+            const top = candidates.reduce((best, current) => current.confidence > best.confidence ? current : best, candidates[0]);
+            const disease = String(top.disease || '미상');
+            const conf = Number(top.confidence || 0);
+            let risk_level = 'safe';
+            if (conf >= 80) risk_level = 'danger';
+            else if (conf >= 60) risk_level = 'warning';
+
+            let rule = {
+                tag_text: `분석 결과: ${disease} (${conf.toFixed(1)}%)`,
+                summary: `${top.side === 'left' ? '좌안' : '우안'}에서 ${disease} 가능성이 관측되었습니다.`,
+                recommended_departments: ['일반 안과'],
+                daily_care: [
+                    '건조한 환경을 피하고 실내 습도를 유지하세요.',
+                    '눈 비비기를 피하고 필요 시 인공눈물을 사용하세요.'
+                ]
+            };
+
+            if (/결막염|Conjunctivitis/i.test(disease)) {
+                rule = {
+                    tag_text: `주의: 결막염 의심 (${conf.toFixed(1)}%)`,
+                    summary: '충혈/가려움 등 결막염 관련 징후가 관찰되었습니다. 증상이 지속되면 진료를 권장합니다.',
+                    recommended_departments: ['일반 안과', '안구건조증 클리닉'],
+                    daily_care: ['손 위생을 철저히 하고 눈 비비기를 피하세요.', '화면 사용 중 20-20-20 규칙으로 눈 피로를 줄이세요.']
+                };
+                risk_level = 'warning';
+            } else if (/백내장|Cataract/i.test(disease)) {
+                rule = {
+                    tag_text: `주의: 백내장 징후 (${conf.toFixed(1)}%)`,
+                    summary: '수정체 혼탁 관련 징후가 감지되었습니다. 시야 흐림이 느껴지면 정밀검사가 필요합니다.',
+                    recommended_departments: ['백내장/망막 전문 안과', '일반 안과'],
+                    daily_care: ['야간 눈부심/시야 흐림 증상을 기록해 진료 시 전달하세요.', '정기적인 시력검사 일정을 권장합니다.']
+                };
+                risk_level = 'danger';
+            } else if (/포도막염|Uveitis/i.test(disease)) {
+                rule = {
+                    tag_text: `주의: 포도막염 의심 (${conf.toFixed(1)}%)`,
+                    summary: '염증성 징후가 관측되었습니다. 통증/광과민이 있으면 빠른 진료가 필요합니다.',
+                    recommended_departments: ['염증성 안질환 클리닉', '일반 안과'],
+                    daily_care: ['강한 빛 노출을 줄이고 선글라스를 사용하세요.', '통증/충혈 악화 시 즉시 병원 방문을 권장합니다.']
+                };
+                risk_level = 'danger';
+            } else if (/다래끼|Eyelid/i.test(disease)) {
+                rule = {
+                    tag_text: `주의: 다래끼 가능성 (${conf.toFixed(1)}%)`,
+                    summary: '눈꺼풀 주변 염증 징후가 감지되었습니다. 증상 지속 시 진료를 권장합니다.',
+                    recommended_departments: ['일반 안과'],
+                    daily_care: ['눈꺼풀을 청결하게 유지하고 화장품 사용을 줄이세요.', '온찜질을 짧게 하루 1~2회 적용하세요.']
+                };
+                risk_level = 'warning';
+            } else if (/일반|Normal/i.test(disease)) {
+                rule = {
+                    tag_text: `정상 소견 우세 (${conf.toFixed(1)}%)`,
+                    summary: '현재 촬영 기준으로 특이 소견이 상대적으로 낮습니다.',
+                    recommended_departments: ['정기 검진용 일반 안과'],
+                    daily_care: ['장시간 화면 사용 시 주기적 휴식을 취하세요.', '충혈/통증이 생기면 조기 검진을 권장합니다.']
+                };
+                risk_level = 'safe';
+            }
+
+            return {
+                risk_level,
+                tag_text: rule.tag_text,
+                summary: rule.summary,
+                recommended_departments: rule.recommended_departments,
+                daily_care: rule.daily_care
+            };
+        }
+
+        async function loadHistory(userId) {
+            const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId)}&limit=1000`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status !== 'ok') {
+                state.historyRecords = [];
+                state.historySessions = [];
+                return;
+            }
+            state.historyRecords = data.history || [];
+            state.historySessions = buildHistorySessions(state.historyRecords);
+        }
+
+        async function loadSurveyHistory(userId) {
+            const res = await fetch(`/api/survey?user_id=${encodeURIComponent(userId)}&limit=100`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status !== 'ok') {
+                state.survey = null;
+                return;
+            }
+            const surveys = data.surveys || [];
+            state.survey = surveys.length ? (surveys[0].survey || null) : null;
+        }
+
+        async function renderPrintableReport() {
+            state.latestSession = state.historySessions[0] || null;
+            const analysis = state.latestSession?.analysis || {};
+            const guide = buildPrintableGuide(analysis);
+            const latestSurvey = state.survey || null;
+            const leftEye = analysis.left_eye || null;
+            const rightEye = analysis.right_eye || null;
+            const leftMeta = getPrintableStatusMeta(leftEye);
+            const rightMeta = getPrintableStatusMeta(rightEye);
+
+            document.getElementById('user-id').textContent = state.userId || 'anonymous';
+            document.getElementById('inspection-time').textContent = state.latestSession?.created_at || '-';
+            document.getElementById('age').textContent = latestSurvey?.age ? `${latestSurvey.age}세` : '-';
+            document.getElementById('gender').textContent = latestSurvey?.gender || '-';
+
+            const symptoms = normalizeSurveySymptoms(latestSurvey);
+            const symptomsNode = document.getElementById('symptoms');
+            symptomsNode.innerHTML = symptoms.length
+                ? symptoms.slice(0, 8).map(item => `<span class="symptom-pill">${escapeHtml(item)}</span>`).join('')
+                : '<span class="symptom-pill">설문 정보 없음</span>';
+
+            document.getElementById('overall-badge').textContent = guide.tag_text || 'AI 분석 대기';
+            document.getElementById('overall-status').textContent = guide.risk_level === 'danger' ? '정밀검사 필요' : (guide.risk_level === 'warning' ? '의심' : '정상');
+            const overallTag = document.getElementById('overall-tag');
+            overallTag.className = `status-pill ${guide.risk_level === 'danger' ? 'status-danger' : (guide.risk_level === 'warning' ? 'status-warning' : 'status-normal')}`;
+            overallTag.textContent = guide.risk_level === 'danger' ? '정밀검사 필요' : (guide.risk_level === 'warning' ? '의심' : '정상');
+            document.getElementById('overall-summary').textContent = guide.summary || '';
+            document.getElementById('overall-departments').innerHTML = (guide.recommended_departments || []).length
+                ? guide.recommended_departments.map(item => `<li>${escapeHtml(item)}</li>`).join('')
+                : '<li>권장 진료 과목 정보 없음</li>';
+            document.getElementById('overall-care').innerHTML = (guide.daily_care || []).length
+                ? guide.daily_care.map(item => `<li>${escapeHtml(item)}</li>`).join('')
+                : '<li>권장 관리 방법 정보 없음</li>';
+
+            const leftStatus = document.getElementById('left-status');
+            leftStatus.className = `status-pill ${leftMeta.className}`;
+            leftStatus.textContent = leftMeta.label;
+            const rightStatus = document.getElementById('right-status');
+            rightStatus.className = `status-pill ${rightMeta.className}`;
+            rightStatus.textContent = rightMeta.label;
+
+            document.getElementById('left-summary').textContent = leftEye
+                ? `좌안: ${leftMeta.disease} · 신뢰도 ${Number(leftMeta.confidence).toFixed(1)}% · 충혈도 ${Number(leftEye.redness || 0).toFixed(4)}`
+                : '좌안 분석 데이터 없음';
+            document.getElementById('right-summary').textContent = rightEye
+                ? `우안: ${rightMeta.disease} · 신뢰도 ${Number(rightMeta.confidence).toFixed(1)}% · 충혈도 ${Number(rightEye.redness || 0).toFixed(4)}`
+                : '우안 분석 데이터 없음';
+
+            const leftBullets = [];
+            if (leftEye) {
+                leftBullets.push(`분류: ${leftMeta.disease}`);
+                leftBullets.push(`신뢰도: ${Number(leftMeta.confidence).toFixed(1)}%`);
+                if (leftEye.detection_confidence != null) leftBullets.push(`검출 신뢰도: ${Number(leftEye.detection_confidence).toFixed(1)}%`);
+                if (leftEye.redness != null) leftBullets.push(`충혈도: ${Number(leftEye.redness).toFixed(4)}`);
+            }
+            document.getElementById('left-bullets').innerHTML = leftBullets.length ? leftBullets.map(item => `<li>${escapeHtml(item)}</li>`).join('') : '<li>좌안 분석 데이터 없음</li>';
+
+            const rightBullets = [];
+            if (rightEye) {
+                rightBullets.push(`분류: ${rightMeta.disease}`);
+                rightBullets.push(`신뢰도: ${Number(rightMeta.confidence).toFixed(1)}%`);
+                if (rightEye.detection_confidence != null) rightBullets.push(`검출 신뢰도: ${Number(rightEye.detection_confidence).toFixed(1)}%`);
+                if (rightEye.redness != null) rightBullets.push(`충혈도: ${Number(rightEye.redness).toFixed(4)}`);
+            }
+            document.getElementById('right-bullets').innerHTML = rightBullets.length ? rightBullets.map(item => `<li>${escapeHtml(item)}</li>`).join('') : '<li>우안 분석 데이터 없음</li>';
+
+            const [leftImage, rightImage] = await Promise.all([
+                resolveSessionEyeImage(state.latestSession, 'L'),
+                resolveSessionEyeImage(state.latestSession, 'R')
+            ]);
+            document.getElementById('left-image').src = leftImage || 'https://via.placeholder.com/640x360/e2e8f0/64748b?text=Left+Eye';
+            document.getElementById('right-image').src = rightImage || 'https://via.placeholder.com/640x360/e2e8f0/64748b?text=Right+Eye';
+
+            document.getElementById('left-caption').textContent = leftEye
+                ? `Confidence: ${Number(leftEye.confidence).toFixed(1)}% · ${leftEye.detection_confidence != null ? `Detection ${Number(leftEye.detection_confidence).toFixed(1)}%` : 'BBox 추출 결과 기반'}`
+                : 'Confidence: - · BBox 추출 결과 기반';
+            document.getElementById('right-caption').textContent = rightEye
+                ? `Confidence: ${Number(rightEye.confidence).toFixed(1)}% · ${rightEye.detection_confidence != null ? `Detection ${Number(rightEye.detection_confidence).toFixed(1)}%` : 'BBox 추출 결과 기반'}`
+                : 'Confidence: - · BBox 추출 결과 기반';
+
+            const rows = [];
+            if (leftEye) rows.push({ side: '좌안', eye: leftEye, meta: leftMeta });
+            if (rightEye) rows.push({ side: '우안', eye: rightEye, meta: rightMeta });
+            document.getElementById('severity-body').innerHTML = rows.length
+                ? rows.map(({ side, eye, meta }) => {
+                    const noteParts = [];
+                    if (eye.redness != null) noteParts.push(`충혈도 ${Number(eye.redness).toFixed(4)}`);
+                    if (eye.detection_confidence != null) noteParts.push(`검출 ${Number(eye.detection_confidence).toFixed(1)}%`);
+                    noteParts.push(`분류 ${meta.disease}`);
+                    return `
+                        <tr>
+                            <td>${side}</td>
+                            <td>${escapeHtml(meta.disease)}</td>
+                            <td><span class="status-pill ${meta.className}">${meta.label}</span></td>
+                            <td><div class="meter"><div class="meter-fill" style="width:${Math.max(8, Math.min(100, meta.meter))}%"></div></div></td>
+                            <td>${escapeHtml(noteParts.join(' · '))}</td>
+                        </tr>
+                    `;
+                }).join('')
+                : '<tr><td colspan="5" class="empty-state">분석 데이터를 불러오는 중...</td></tr>';
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            state.userId = readSessionValue('user_id') || 'anonymous';
+            await Promise.all([
+                loadHistory(state.userId),
+                loadSurveyHistory(state.userId)
+            ]);
+            await renderPrintableReport();
+        });
+    </script>
+</body>
+</html>

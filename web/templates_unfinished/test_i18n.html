@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>i18n System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test-box { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { background: #d4edda; border-color: #28a745; }
+        .fail { background: #f8d7da; border-color: #dc3545; }
+        button { padding: 8px 15px; margin: 5px; cursor: pointer; }
+        .status { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1 data-i18n="main_title">Smart Eye Diagnosis i18n System - Test Suite</h1>
+
+    <div class="test-box pass">
+        <h3>✓ Test 1: translations.js Loaded</h3>
+        <p id="test1-result">Checking...</p>
+    </div>
+
+    <div class="test-box pass">
+        <h3>✓ Test 2: i18n.js Loaded</h3>
+        <p id="test2-result">Checking...</p>
+    </div>
+
+    <div class="test-box">
+        <h3>✓ Test 3: Language Support</h3>
+        <div>
+            <button onclick="testLanguage('ko')">한국어 (ko)</button>
+            <button onclick="testLanguage('en')">English (en)</button>
+            <button onclick="testLanguage('zh')">中文 (zh)</button>
+            <button onclick="testLanguage('vi')">Tiếng Việt (vi)</button>
+        </div>
+        <p id="test3-result">Click a language button to test...</p>
+    </div>
+
+    <div class="test-box">
+        <h3>✓ Test 4: Translation Keys</h3>
+        <p id="test4-result">Checking...</p>
+    </div>
+
+    <div class="test-box">
+        <h3>✓ Test 5: getCurrentLanguage() for LLM API</h3>
+        <p id="test5-result">Checking...</p>
+        <pre id="test5-example" style="background: #f5f5f5; padding: 10px; border-radius: 3px;"></pre>
+    </div>
+
+    <div class="test-box">
+        <h3>✓ Test 6: DOM Translation (data-i18n)</h3>
+        <p>Test HTML:</p>
+        <div id="test-dom-area" style="border: 1px dashed #999; padding: 10px; background: #fafafa;">
+            <h2 data-i18n="main_title">This should be translated</h2>
+            <p data-i18n="helper_disclaimer">This should be translated</p>
+            <input type="text" data-i18n="kakao_link_placeholder" data-i18n-placeholder="true" placeholder="Original placeholder">
+        </div>
+        <button onclick="testDOMTranslation('ko')">Apply Korean</button>
+        <button onclick="testDOMTranslation('en')">Apply English</button>
+    </div>
+
+    <div id="status" class="status">Ready for testing...</div>
+
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/i18n.js"></script>
+
+    <script>
+        window.testResults = {
+            test1: false,
+            test2: false,
+            test3: false,
+            test4: false,
+            test5: false,
+            test6: false
+        };
+
+        // Test 1: Check translations object
+        function runTest1() {
+            const result = document.getElementById('test1-result');
+            try {
+                if (typeof translations === 'object' && translations.ko && translations.en && translations.zh && translations.vi) {
+                    result.textContent = `✓ translations object found with ${Object.keys(translations).length} languages`;
+                    result.textContent += ` | Total keys in 'ko': ${Object.keys(translations.ko).length}`;
+                    testResults.test1 = true;
+                    return true;
+                }
+            } catch (e) {
+                result.textContent = `✗ Error: ${e.message}`;
+            }
+            return false;
+        }
+
+        // Test 2: Check i18n object
+        function runTest2() {
+            const result = document.getElementById('test2-result');
+            try {
+                if (typeof i18n === 'object' && typeof i18n.getCurrentLanguage === 'function') {
+                    const currentLang = i18n.getCurrentLanguage();
+                    result.textContent = `✓ i18n object initialized | Current language: ${currentLang}`;
+                    testResults.test2 = true;
+                    return true;
+                }
+            } catch (e) {
+                result.textContent = `✗ Error: ${e.message}`;
+            }
+            return false;
+        }
+
+        // Test 3: Test language switching
+        function testLanguage(lang) {
+            const result = document.getElementById('test3-result');
+            try {
+                i18n.changeLanguage(lang);
+                const current = i18n.getCurrentLanguage();
+                result.textContent = `✓ Language changed to: ${lang} | Current: ${current} | Main title: "${i18n.getTranslation('main_title')}"`;
+                testResults.test3 = true;
+                updateStatus();
+            } catch (e) {
+                result.textContent = `✗ Error: ${e.message}`;
+            }
+        }
+
+        // Test 4: Check key translations
+        function runTest4() {
+            const result = document.getElementById('test4-result');
+            try {
+                i18n.changeLanguage('en');
+                const keys = ['main_title', 'btn_start_diagnosis', 'mobile_o2o_title', 'kakao_link_title'];
+                let keyCheck = '';
+                keys.forEach(key => {
+                    const trans = i18n.getTranslation(key);
+                    keyCheck += `<br>• "${key}": "${trans}"`;
+                });
+                result.innerHTML = `✓ Sample translations retrieved:${keyCheck}`;
+                testResults.test4 = true;
+                return true;
+            } catch (e) {
+                result.textContent = `✗ Error: ${e.message}`;
+            }
+            return false;
+        }
+
+        // Test 5: LLM Integration example
+        function runTest5() {
+            const result = document.getElementById('test5-result');
+            const example = document.getElementById('test5-example');
+            try {
+                const currentLang = i18n.getCurrentLanguage();
+                result.textContent = `✓ getCurrentLanguage() returns: "${currentLang}"`;
+
+                const exampleCode = `
+// Example: Backend API Call
+const apiPayload = {
+    diagnosis_result: { disease: 'normal', confidence: 0.95 },
+    patient_info: { age: 45, gender: 'M' },
+    language: i18n.getCurrentLanguage()  // ← Add this line
+};
+
+// Send to backend
+fetch('/api/generate_report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(apiPayload)
+}).then(res => res.json())
+  .then(data => console.log('Report:', data));
+
+// Backend receives:
+// {
+//   "diagnosis_result": {...},
+//   "patient_info": {...},
+//   "language": "${currentLang}"
+// }
+                `;
+                example.textContent = exampleCode;
+                testResults.test5 = true;
+                return true;
+            } catch (e) {
+                result.textContent = `✗ Error: ${e.message}`;
+            }
+            return false;
+        }
+
+        // Test 6: DOM Translation
+        function testDOMTranslation(lang) {
+            try {
+                i18n.changeLanguage(lang);
+                i18n.applyTranslations();
+                const result = document.getElementById('test3-result');
+                result.textContent = `✓ DOM translations applied for language: ${lang}`;
+                testResults.test6 = true;
+                updateStatus();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('status');
+            const passCount = Object.values(testResults).filter(v => v).length;
+            const totalCount = Object.keys(testResults).length;
+            status.textContent = `Status: ${passCount}/${totalCount} tests passing`;
+            if (passCount === totalCount) {
+                status.textContent += ' ✓ All tests passed!';
+                status.style.color = 'green';
+            }
+        }
+
+        // Run tests on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            runTest1();
+            runTest2();
+            runTest4();
+            runTest5();
+            updateStatus();
+        });
+    </script>
+</body>
+</html>

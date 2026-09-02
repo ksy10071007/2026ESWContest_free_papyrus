@@ -1,0 +1,2620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안구 건강 추적 리포트</title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var theme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/chat-widget.css">
+        <!-- i18n Global Support -->
+        <link rel="stylesheet" href="/static/css/i18n-common.css">
+        <script src="/static/js/translations.js"></script>
+        <script src="/static/js/i18n.js"></script>
+        <!-- Global language FAB intentionally not included on this page -->
+    <script defer src="/static/js/chat-widget.js"></script>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #1d1d1f;
+            --border: #d2d2d7;
+            --accent: #28cd41;
+            --danger: #ff3b30;
+            --safe-top: env(safe-area-inset-top, 0);
+            --safe-bottom: env(safe-area-inset-bottom, 0);
+            --safe-left: env(safe-area-inset-left, 0);
+            --safe-right: env(safe-area-inset-right, 0);
+            --fluid-padding: clamp(12px, 3vw, 24px);
+            --fluid-gap: clamp(12px, 2vw, 24px);
+            --fluid-radius: clamp(12px, 3vw, 20px);
+            --viewport-aspect: 1;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ea1ff;
+            --bg: #0f1115;
+            --card: #161a22;
+            --text: #e5e7eb;
+            --border: #2a3240;
+            --accent: #34d399;
+            --danger: #f87171;
+        }
+
+        .theme-toggle-floating {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 999px;
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+        }
+
+        .theme-toggle-floating:hover { transform: translateX(-50%) translateY(-1px); }
+        .theme-toggle-floating:active { transform: translateX(-50%) scale(0.98); }
+
+        [data-theme="dark"] .summary-box { background: #0f172a; }
+        [data-theme="dark"] .action-box { background: #0f172a; border-color: var(--border); }
+        [data-theme="dark"] .bar-track,
+        [data-theme="dark"] .trend-track { background: #334155; }
+        [data-theme="dark"] .history-item,
+        [data-theme="dark"] .survey-item,
+        [data-theme="dark"] .line-chart-wrap,
+        [data-theme="dark"] .line-svg { background: #0f172a; }
+        [data-theme="dark"] .line-chart-title,
+        [data-theme="dark"] .line-legend,
+        [data-theme="dark"] .history-date,
+        [data-theme="dark"] .trend-date,
+        [data-theme="dark"] .trend-label,
+        [data-theme="dark"] .trend-value,
+        [data-theme="dark"] .survey-meta,
+        [data-theme="dark"] .history-desc,
+        [data-theme="dark"] .survey-summary,
+        [data-theme="dark"] .user-info { color: #cbd5e1; }
+        [data-theme="dark"] .btn-home {
+            background: var(--primary);
+            color: #ffffff;
+        }
+        [data-theme="dark"] .btn-print {
+            background: #334155;
+            color: #e5e7eb;
+        }
+        [data-theme="dark"] .btn-kakao {
+            background: #1e293b;
+            color: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            width: 1240px; 
+            height: 760px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        h1 { font-size: 1.8rem; color: var(--primary); margin: 0; }
+        .user-info { font-weight: 600; color: #666; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: stretch;
+            margin-bottom: 26px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .guide-card {
+            padding-bottom: 20px;
+        }
+
+        h2 { font-size: 1.2rem; margin-bottom: 15px; border-left: 5px solid var(--primary); padding-left: 10px; }
+
+        /* 히스토리 비교 섹션 */
+        .history-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            padding-right: 4px;
+        }
+
+        .eye-compare-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            text-align: center;
+        }
+
+        .eye-frame {
+            background: #000;
+            border-radius: 15px;
+            height: 156px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: 0.2s;
+            position: relative;
+        }
+
+        .eye-frame:hover { border-color: var(--primary); }
+        .eye-frame img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .date-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+        }
+
+        /* 진단 및 관리 요약 */
+        .summary-box {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .result-tag {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        .tag-danger { background: #ffe5e5; color: var(--danger); }
+        .tag-warning { background: #fff4e5; color: #b45309; }
+        .tag-safe { background: #e5f9e5; color: var(--accent); }
+
+        .method-list {
+            padding-left: 20px;
+            margin: 10px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .redness-graph {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .graph-row {
+            display: grid;
+            grid-template-columns: 90px 1fr 76px;
+            gap: 10px;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+
+        .bar-track {
+            width: 100%;
+            height: 10px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #34d399, #f59e0b, #ef4444);
+        }
+
+        .red-level-normal { color: #16a34a; font-weight: 700; }
+        .red-level-mild { color: #ca8a04; font-weight: 700; }
+        .red-level-severe { color: #ea580c; font-weight: 700; }
+        .red-level-very-severe { color: #dc2626; font-weight: 800; }
+
+        .all-history-list {
+            margin-top: 10px;
+            display: grid;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .history-records-box {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .summary-box.history-records-box {
+            max-height: 260px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-records-box .all-history-list {
+            flex: 1 1 auto;
+            height: 100%;
+            max-height: none;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 10px;
+            padding: 8px 10px;
+            display: grid;
+            grid-template-columns: 92px 1fr auto auto auto;
+            gap: 8px;
+            align-items: center;
+            font-size: 0.82rem;
+        }
+
+        .history-date {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .history-desc {
+            color: #334155;
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-view-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #fff;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        .history-view-btn.right {
+            background: #0f172a;
+        }
+
+        .history-delete-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #fff;
+            background: #ef4444;
+            cursor: pointer;
+        }
+
+        .survey-list {
+            margin-top: 8px;
+            display: grid;
+            gap: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .survey-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            background: #fff;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .survey-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0,122,255,0.10);
+        }
+
+        .survey-meta {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .survey-summary {
+            font-size: 0.85rem;
+            color: #334155;
+            line-height: 1.4;
+        }
+
+        .survey-delete-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #fff;
+            background: #ef4444;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .trend-rows {
+            margin-top: 8px;
+            display: grid;
+            gap: 6px;
+            max-height: 168px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .trend-row {
+            display: grid;
+            grid-template-columns: 92px 1fr 1fr;
+            gap: 8px;
+            align-items: center;
+            font-size: 0.78rem;
+        }
+
+        .trend-date {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .trend-metric {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trend-label {
+            min-width: 16px;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .trend-track {
+            flex: 1;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .trend-fill-left {
+            height: 100%;
+            background: #3b82f6;
+        }
+
+        .trend-fill-right {
+            height: 100%;
+            background: #ef4444;
+        }
+
+        .trend-fill-health {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+        }
+
+        .trend-value {
+            min-width: 42px;
+            text-align: right;
+            color: #334155;
+            font-weight: 700;
+        }
+
+        .line-chart-wrap {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .line-chart-title {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .line-svg {
+            width: 100%;
+            height: 180px;
+            display: block;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .line-legend {
+            margin-top: 6px;
+            display: flex;
+            gap: 10px;
+            font-size: 0.76rem;
+            color: #475569;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* 하단 버튼 */
+        .footer-btns {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 0 0 14px 0;
+            padding-bottom: 2px;
+        }
+
+        .action-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .trend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 34px;
+            padding: 0 2px 6px 2px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 14px;
+        }
+
+        .trend-card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 16px 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .btn {
+            padding: 13px 28px;
+            border-radius: 12px;
+            border: none;
+            font-size: 0.98rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            letter-spacing: -0.2px;
+        }
+        .btn-home { background: var(--primary); color: white; }
+        .btn-print { background: #1d1d1f; color: white; }
+        .btn-kakao { background: #334155; color: #fff; }
+
+        .pdf-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 1300;
+            background: rgba(15, 23, 42, 0.65);
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            box-sizing: border-box;
+        }
+
+        .pdf-panel {
+            width: min(1200px, 100%);
+            height: min(760px, 100%);
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+        }
+
+        .pdf-header {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+
+        .pdf-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .pdf-close-btn {
+            border: none;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .pdf-frame {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: #fff;
+        }
+
+        [data-theme="dark"] .pdf-panel,
+        [data-theme="dark"] .pdf-frame { background: #0f172a; }
+        [data-theme="dark"] .pdf-header { background: #111827; }
+        [data-theme="dark"] .pdf-title { color: #cbd5e1; }
+        [data-theme="dark"] .pdf-close-btn {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .survey-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 1350;
+            background: rgba(15, 23, 42, 0.65);
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            box-sizing: border-box;
+        }
+
+        .survey-panel {
+            width: min(1180px, 100%);
+            height: min(700px, 100%);
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+        }
+
+        .survey-header {
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+
+        .survey-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .survey-close-btn {
+            border: none;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .survey-body {
+            flex: 1;
+            overflow: auto;
+            padding: 10px 12px;
+            box-sizing: border-box;
+            background: var(--bg);
+        }
+
+        .survey-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            align-items: start;
+            align-content: start;
+        }
+
+        .survey-card {
+            background: var(--card);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            box-sizing: border-box;
+            height: fit-content;
+        }
+
+        .survey-card h3 {
+            font-size: 1rem;
+            margin: 0 0 6px 0;
+            color: var(--primary);
+        }
+
+        .survey-row {
+            display: grid;
+            grid-template-columns: 118px 1fr;
+            gap: 6px;
+            align-items: start;
+            margin-bottom: 5px;
+            font-size: 0.86rem;
+        }
+
+        .survey-label {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .survey-value {
+            color: #334155;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .survey-symptom-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .survey-symptom-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 8px 10px;
+            font-size: 0.86rem;
+            color: #334155;
+        }
+
+        .survey-empty {
+            font-size: 0.86rem;
+            color: #64748b;
+            padding: 8px 9px;
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        [data-theme="dark"] .survey-panel,
+        [data-theme="dark"] .survey-body { background: #0f172a; }
+        [data-theme="dark"] .survey-header { background: #111827; }
+        [data-theme="dark"] .survey-title { color: #cbd5e1; }
+        [data-theme="dark"] .survey-close-btn {
+            background: #334155;
+            color: #e2e8f0;
+        }
+        [data-theme="dark"] .survey-label { color: #94a3b8; }
+        [data-theme="dark"] .survey-value { color: #e2e8f0; }
+        [data-theme="dark"] .survey-symptom-item,
+        [data-theme="dark"] .survey-empty {
+            background: #111827;
+            color: #e2e8f0;
+            border-color: var(--border);
+        }
+
+        /* 팝업 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content { max-width: 90%; max-height: 90%; border-radius: 10px; }
+
+        .confirm-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translateX(-50%);
+            width: min(92vw, 520px);
+            background: #1f2937;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.28);
+            padding: 14px;
+            z-index: 1200;
+            display: none;
+        }
+
+        .confirm-toast.show {
+            display: block;
+        }
+
+        .confirm-toast-message {
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+            word-break: keep-all;
+        }
+
+        .confirm-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .toast-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast-btn-cancel {
+            background: #64748b;
+            color: #fff;
+        }
+
+        .toast-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                height: auto;
+                max-width: 100vw;
+                padding: 12px;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 0;
+                margin-bottom: 12px;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+
+            .main-grid,
+            .trend-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .card,
+            .trend-card {
+                padding: 14px;
+            }
+
+            .eye-compare-box {
+                grid-template-columns: 1fr;
+            }
+
+            .eye-frame {
+                height: 190px;
+            }
+
+            .history-item {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                align-items: stretch;
+            }
+
+            .history-records-box {
+                flex: none;
+            }
+
+            .history-records-box .all-history-list {
+                min-height: 0;
+                max-height: 280px;
+                overflow-y: auto;
+            }
+
+            .history-desc {
+                white-space: normal;
+            }
+
+            .survey-item {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-btns {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .btn,
+            .history-view-btn,
+            .history-delete-btn,
+            .survey-delete-btn,
+            .toast-btn {
+                min-height: 48px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+
+        /* ============================================
+           모바일 유동적 반응형 스타일
+           ============================================ */
+
+        @media screen and (max-width: 480px) {
+            body {
+                width: 100%;
+                height: auto;
+                min-height: 100dvh;
+                padding: clamp(8px, 3vw, 12px);
+                gap: clamp(8px, 2vw, 12px);
+                overflow-x: hidden;
+            }
+
+            h1 { font-size: clamp(1.4rem, 4vw, 1.8rem); }
+            h2 { font-size: clamp(1rem, 3.5vw, 1.2rem); }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: clamp(12px, 2vw, 20px);
+            }
+
+            .card {
+                padding: clamp(12px, 3vw, 20px);
+                border-radius: clamp(12px, 3vw, 20px);
+            }
+
+            .eye-compare-box {
+                grid-template-columns: 1fr 1fr;
+                gap: clamp(8px, 2vw, 10px);
+            }
+
+            .eye-frame {
+                height: clamp(100px, 30vw, 150px);
+            }
+
+            .date-badge {
+                font-size: clamp(0.7rem, 1.5vw, 0.8rem);
+            }
+
+            .graph-row {
+                grid-template-columns: clamp(70px, 20vw, 90px) 1fr clamp(60px, 18vw, 76px);
+                font-size: clamp(0.75rem, 2vw, 0.85rem);
+            }
+
+            .all-history-list {
+                max-height: clamp(150px, 40vh, 280px);
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+
+            .history-item {
+                padding: clamp(6px, 2vw, 10px);
+                font-size: clamp(0.75rem, 2vw, 0.82rem);
+            }
+
+            .result-tag {
+                font-size: clamp(0.8rem, 2vw, 0.9rem);
+                padding: clamp(4px, 1.5vw, 8px) clamp(8px, 2vw, 12px);
+            }
+
+            .btn,
+            .history-view-btn,
+            .history-delete-btn,
+            .survey-delete-btn {
+                font-size: clamp(0.9rem, 2.5vw, 1rem);
+                padding: clamp(10px, 2.5vw, 14px);
+            }
+        }
+
+        @media screen and (min-width: 481px) and (max-width: 768px) {
+            body {
+                width: 100%;
+                height: auto;
+                min-height: 100dvh;
+                padding: clamp(12px, 2vw, 16px);
+                gap: clamp(12px, 1.5vw, 20px);
+                overflow-x: hidden;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: clamp(14px, 1.5vw, 20px);
+            }
+
+            .card {
+                padding: clamp(14px, 2.5vw, 20px);
+            }
+
+            .eye-frame {
+                height: clamp(120px, 35vw, 160px);
+            }
+
+            .all-history-list {
+                max-height: clamp(180px, 45vh, 300px);
+            }
+
+            .btn,
+            .history-view-btn,
+            .history-delete-btn,
+            .survey-delete-btn {
+                min-height: 44px;
+            }
+        }
+
+        @media screen and (min-width: 769px) and (max-width: 1024px) {
+            body {
+                width: 100%;
+                height: auto;
+                min-height: 100dvh;
+                padding: clamp(14px, 2vw, 20px);
+                overflow: auto;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: clamp(14px, 1.5vw, 20px);
+            }
+
+            .card {
+                padding: clamp(14px, 2vw, 20px);
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            body {
+                height: auto;
+                min-height: 100dvh;
+                padding: clamp(8px, 1vw, 12px);
+                gap: clamp(8px, 1vw, 12px);
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .eye-compare-box {
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+
+            .eye-frame {
+                height: clamp(80px, 60dvh, 200px);
+            }
+
+            .all-history-list {
+                max-height: clamp(100px, 50dvh, 250px);
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            body {
+                padding-top: max(var(--safe-top), clamp(8px, 2vw, 12px));
+                padding-bottom: max(var(--safe-bottom), clamp(8px, 2vw, 12px));
+                padding-left: max(var(--safe-left), clamp(8px, 2vw, 12px));
+                padding-right: max(var(--safe-right), clamp(8px, 2vw, 12px));
+            }
+
+            .card {
+                border-radius: var(--fluid-radius);
+            }
+
+            .theme-toggle-floating {
+                top: max(18px, calc(var(--safe-top) + 8px));
+            }
+        }
+
+        /* 극소형 화면 (≤380px) */
+        @media screen and (max-width: 380px) {
+            body {
+                padding: clamp(6px, 2vw, 10px);
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+
+            .card {
+                padding: clamp(8px, 2.5vw, 12px);
+            }
+
+            h1 { font-size: clamp(1.2rem, 3.5vw, 1.5rem); }
+            h2 { font-size: clamp(0.9rem, 3vw, 1.1rem); }
+
+            .eye-frame {
+                height: clamp(90px, 25vw, 120px);
+            }
+
+            .graph-row {
+                grid-template-columns: clamp(60px, 18vw, 80px) 1fr clamp(50px, 15vw, 70px);
+                gap: clamp(6px, 1.5vw, 8px);
+            }
+
+            .result-tag {
+                font-size: clamp(0.75rem, 1.8vw, 0.85rem);
+            }
+        }
+
+        /* 유동적 유틸리티 클래스 */
+        .fluid-padding { padding: var(--fluid-padding); }
+        .fluid-gap { gap: var(--fluid-gap); }
+        .fluid-radius { border-radius: var(--fluid-radius); }
+
+        .hide-on-mobile { display: block; }
+        .show-only-mobile { display: none; }
+
+        @media screen and (max-width: 768px) {
+            .hide-on-mobile { display: none !important; }
+            .show-only-mobile { display: block !important; }
+        }
+
+        .hide-on-landscape { display: block; }
+        .show-only-landscape { display: none; }
+
+        @media (orientation: landscape) {
+            .hide-on-landscape { display: none !important; }
+            .show-only-landscape { display: block !important; }
+        }
+
+        /* 유동적 폰트 크기 */
+        .text-fluid-sm { font-size: clamp(0.75rem, 2vw, 0.875rem); }
+        .text-fluid-base { font-size: clamp(0.875rem, 2.5vw, 1rem); }
+        .text-fluid-lg { font-size: clamp(1rem, 3vw, 1.2rem); }
+        .text-fluid-xl { font-size: clamp(1.1rem, 3.5vw, 1.5rem); }
+
+        /* 안전 영역 패딩 */
+        .with-safe-area {
+            padding-top: max(12px, var(--safe-top));
+            padding-bottom: max(12px, var(--safe-bottom));
+            padding-left: max(12px, var(--safe-left));
+            padding-right: max(12px, var(--safe-right));
+        }
+
+        /* 터치 기기 최적화 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn,
+            .history-view-btn,
+            .history-delete-btn,
+            .survey-delete-btn,
+            button {
+                min-height: clamp(44px, 10vw, 52px);
+                padding: clamp(12px, 3vw, 18px);
+            }
+
+            .eye-frame,
+            button {
+                transition: background-color 0.2s ease;
+            }
+
+            button:active {
+                transform: scale(0.98);
+            }
+        }
+
+        /* 마우스 호버 가능 기기 */
+        @media (hover: hover) and (pointer: fine) {
+            .btn,
+            .history-view-btn,
+            .history-delete-btn,
+            .survey-delete-btn,
+            button {
+                transition: all 0.2s ease;
+            }
+
+            .btn:hover,
+            .history-view-btn:hover,
+            .history-delete-btn:hover,
+            .survey-delete-btn:hover {
+                transform: translateY(-2px);
+            }
+
+            .eye-frame:hover {
+                transform: scale(1.02);
+            }
+        }
+
+        /* 감소 모션 선호 */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* 높은 명도 대비 선호 */
+        @media (prefers-contrast: more) {
+            body {
+                --primary: #0051d5;
+                --text: #000;
+                --border: #333;
+            }
+
+            [data-theme="dark"] {
+                --primary: #66b3ff;
+                --text: #fff;
+                --border: #999;
+            }
+
+            .btn,
+            h1, h2 {
+                font-weight: 900;
+            }
+        }
+
+        /* 동적 뷰포트 폭 대응 */
+        @supports (width: 100dvw) {
+            @media screen and (max-width: 768px) {
+                body {
+                    width: 100dvw;
+                    min-height: 100dvh;
+                }
+            }
+        }
+
+        /* 입력 필드 자동 줌 방지 */
+        input,
+        textarea,
+        select {
+            font-size: 16px;
+        }
+
+        @media screen and (max-width: 768px) {
+            input,
+            textarea,
+            select {
+                font-size: 16px !important;
+            }
+        }
+
+        /* 접근성 - 키보드 네비게이션 표시기 */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* 레이아웃 이동 최소화 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 data-i18n="report_title">👁️ 안구 건강 종합 리포트</h1>
+        <div class="user-info" id="user-display" data-i18n="user_info_loading">사용자 정보 불러오는 중...</div>
+    </header>
+
+    <div class="main-grid">
+        <div class="card">
+            <h2>📅 검사 이력 비교 (최근 2회)</h2>
+            <p style="font-size: 0.9rem; color: #666;">사진을 클릭하면 해당 시점의 정밀 사진을 볼 수 있습니다.</p>
+            
+            <div class="history-section">
+                <div>
+                    <strong style="display:block; margin-bottom:8px;">[현재 눈]</strong>
+                    <div class="eye-compare-box">
+                        <div class="eye-frame" onclick="viewImage('current_L')">
+                            <span id="badge-curr-L" class="date-badge" style="background:var(--primary)">왼쪽 눈</span>
+                            <img src="" id="img-curr-L">
+                        </div>
+                        <div class="eye-frame" onclick="viewImage('current_R')">
+                            <span id="badge-curr-R" class="date-badge" style="background:var(--primary)">오른쪽 눈</span>
+                            <img src="" id="img-curr-R">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <strong style="display:block; margin-bottom:8px;">[과거 검사 사진]</strong>
+                    <div class="eye-compare-box">
+                        <div class="eye-frame" onclick="viewImage('past_L')">
+                            <span id="badge-past-L" class="date-badge">왼쪽 눈</span>
+                            <img src="https://via.placeholder.com/200x150/333/fff?text=Past+L" id="img-past-L">
+                        </div>
+                        <div class="eye-frame" onclick="viewImage('past_R')">
+                            <span id="badge-past-R" class="date-badge">오른쪽 눈</span>
+                            <img src="https://via.placeholder.com/200x150/333/fff?text=Past+R" id="img-past-R">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-box history-records-box" style="margin-top: 4px; margin-bottom: 0;">
+                    <strong style="color:var(--primary)">🗂️ 전체 검사 기록</strong>
+                    <div id="all-history-list" class="all-history-list">
+                        <div style="font-size:0.85rem; color:#64748b;">기록 불러오는 중...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card guide-card">
+            <h2>🔬 AI 진단 및 관리 가이드</h2>
+
+            <div class="action-box">
+                <div class="footer-btns">
+                    <button class="btn btn-home" onclick="location.href='/'">메인으로</button>
+                    <button class="btn btn-home" onclick="location.href='/result'">결과로 돌아가기</button>
+                    <button id="btn-share-report" class="btn btn-print" onclick="generateShareReport()">📄 보고서 발행</button>
+                    <button id="btn-send-kakao" class="btn btn-kakao" onclick="sendReportToKakao()">💬 카카오로 보내기</button>
+                </div>
+            </div>
+            
+            <div class="summary-box">
+                <span id="guide-tag" class="result-tag tag-safe">분석 대기</span>
+                <p id="guide-summary" style="margin: 0; font-size: 1rem; line-height: 1.5;">
+                    AI 분석 데이터가 준비되면 이 영역에 요약이 표시됩니다.
+                </p>
+            </div>
+
+            <div class="summary-box">
+                <strong style="color:var(--primary)">👨‍⚕️ 권장 진료 과목</strong>
+                <ul id="guide-departments" class="method-list">
+                    <li>분석 대기 중...</li>
+                </ul>
+            </div>
+
+            <div class="summary-box">
+                <strong style="color:var(--accent)">🌿 일상 관리 방법</strong>
+                <ul id="guide-care" class="method-list">
+                    <li>분석 대기 중...</li>
+                </ul>
+            </div>
+
+            <div class="summary-box">
+                <strong style="color:var(--primary)">📝 검사 시 작성한 설문</strong>
+                <div id="survey-history-list" class="survey-list">
+                    <div style="font-size:0.85rem; color:#64748b;">설문 기록 불러오는 중...</div>
+                </div>
+            </div>
+
+            <div class="summary-box">
+                <strong style="color:var(--primary)">📊 충혈도 비교 (현재 vs 과거)</strong>
+                <div style="font-size:0.8rem; color:#64748b; margin-top:6px;">
+                    기준: 정상(&lt;0.08) · 경미(0.08~&lt;0.14) · 심함(0.14~&lt;0.22) · 매우심함(≥0.22)
+                </div>
+                <div id="redness-graph" class="redness-graph">
+                    <div style="font-size:0.9rem; color:#64748b; margin-top:8px;">비교 데이터 준비 중...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="trend-grid">
+        <div class="trend-card">
+            <strong style="color:var(--primary)">📈 충혈도 추이 (전체 기록)</strong>
+            <div style="font-size:0.8rem; color:#64748b; margin-top:6px;">
+                각 검사 시점의 좌/우 충혈도 변화를 막대 그래프로 표시합니다.
+            </div>
+            <div id="redness-trend-rows" class="trend-rows">
+                <div style="font-size:0.9rem; color:#64748b; margin-top:8px;">추이 데이터 준비 중...</div>
+            </div>
+            <div class="line-chart-wrap">
+                <div class="line-chart-title">라인 차트 보기</div>
+                <svg id="redness-line-chart" class="line-svg" viewBox="0 0 620 180" preserveAspectRatio="none"></svg>
+                <div class="line-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span>좌안</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span>우안</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="trend-card">
+            <strong style="color:var(--accent)">📉 눈건강 지표 추이 (확장 가능)</strong>
+            <div style="font-size:0.8rem; color:#64748b; margin-top:6px;">
+                현재는 AI 위험도/평균 충혈도로 표시되며, 추후 지표 추가 시 자동 확장됩니다.
+            </div>
+            <div id="health-metric-trend-rows" class="trend-rows">
+                <div style="font-size:0.9rem; color:#64748b; margin-top:8px;">지표 데이터 준비 중...</div>
+            </div>
+            <div class="line-chart-wrap">
+                <div class="line-chart-title">라인 차트 보기</div>
+                <svg id="health-line-chart" class="line-svg" viewBox="0 0 620 180" preserveAspectRatio="none"></svg>
+                <div class="line-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>AI 위험도(0~100)</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#10b981;"></span>평균 충혈도 점수(0~100)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="imageModal" class="modal" onclick="this.style.display='none'">
+        <img class="modal-content" id="modal-img">
+    </div>
+
+    <div id="pdf-overlay" class="pdf-overlay" onclick="closeReportPdfModal(event)">
+        <div class="pdf-panel" onclick="event.stopPropagation()">
+            <div class="pdf-header">
+                <div class="pdf-title" data-i18n="pdf_preview_title">📄 보고서 미리보기</div>
+                <button class="pdf-close-btn" onclick="closeReportPdfModal()" data-i18n="btn_report_back">리포트로 돌아가기</button>
+            </div>
+            <iframe id="pdf-frame" class="pdf-frame" src="about:blank" title="PDF 보고서"></iframe>
+        </div>
+    </div>
+
+    <div id="survey-overlay" class="survey-overlay" onclick="closeSurveyPreviewModal(event)">
+        <div class="survey-panel" onclick="event.stopPropagation()">
+            <div class="survey-header">
+                <div class="survey-title" data-i18n="survey_details_title">📝 작성한 설문 상세 보기</div>
+                <button class="survey-close-btn" onclick="closeSurveyPreviewModal()" data-i18n="btn_report_back">리포트로 돌아가기</button>
+            </div>
+            <div class="survey-body" id="survey-preview-body"></div>
+        </div>
+    </div>
+
+    <div id="confirm-toast" class="confirm-toast" role="dialog" aria-modal="true" aria-live="assertive">
+        <div id="confirm-toast-message" class="confirm-toast-message"></div>
+        <div class="confirm-toast-actions">
+            <button id="confirm-toast-cancel" class="toast-btn toast-btn-cancel">취소</button>
+            <button id="confirm-toast-ok" class="toast-btn toast-btn-confirm">삭제</button>
+        </div>
+    </div>
+
+    <script>
+        let historyRecords = [];
+        let historySessions = [];
+        let previewSlots = {
+            current: { L: null, R: null },
+            past: { L: null, R: null }
+        };
+        let surveyRecords = [];
+        let activeUserId = 'anonymous';
+
+        function readSessionValue(key) {
+            const current = sessionStorage.getItem(key);
+            if (current !== null) return current;
+
+            const legacy = localStorage.getItem(key);
+            if (legacy !== null) {
+                sessionStorage.setItem(key, legacy);
+                localStorage.removeItem(key);
+            }
+            return legacy;
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            const age = readSessionValue('user_age') || "24";
+            const userId = readSessionValue('user_id') || "anonymous";
+            activeUserId = userId;
+            document.getElementById('user-display').innerText = `사용자: ${userId} 님 (${age}세)`;
+
+            await loadHistory(userId);
+            await loadSurveyHistory(userId);
+        });
+
+        async function loadHistory(userId) {
+            try {
+                const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId)}&limit=1000`);
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'ok') {
+                    return;
+                }
+
+                historyRecords = data.history || [];
+                await applyHistoryToUI(historyRecords);
+            } catch (err) {
+                console.error('[report history fetch error]', err);
+            }
+        }
+
+        async function loadSurveyHistory(userId) {
+            try {
+                const res = await fetch(`/api/survey?user_id=${encodeURIComponent(userId)}&limit=100`);
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'ok') {
+                    renderSurveyHistoryList([]);
+                    return;
+                }
+
+                surveyRecords = data.surveys || [];
+                renderSurveyHistoryList(surveyRecords);
+            } catch (err) {
+                console.error('[report survey fetch error]', err);
+                renderSurveyHistoryList([]);
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildSurveySummaryText(survey) {
+            if (!survey || typeof survey !== 'object') return '설문 내용 없음';
+
+            const age = survey.age ? `${survey.age}세` : null;
+            const gender = survey.gender || null;
+            const symptoms = Array.isArray(survey.symptoms) ? survey.symptoms.filter(Boolean) : [];
+            const symptomsText = symptoms.length ? symptoms.slice(0, 3).join(', ') : null;
+
+            const chunks = [];
+            if (age) chunks.push(age);
+            if (gender) chunks.push(gender);
+            if (symptomsText) chunks.push(`증상: ${symptomsText}`);
+
+            return chunks.length ? chunks.join(' · ') : '설문 내용 없음';
+        }
+
+        function renderSurveyHistoryList(records) {
+            const target = document.getElementById('survey-history-list');
+            if (!target) return;
+
+            if (!records || !records.length) {
+                target.innerHTML = '<div style="font-size:0.85rem; color:#64748b;">저장된 설문 기록이 없습니다.</div>';
+                return;
+            }
+
+            target.innerHTML = records.map((item) => {
+                const dateText = formatShortDateTime(item.created_at);
+                const summary = buildSurveySummaryText(item.survey || {});
+                return `
+                    <div class="survey-item" onclick="openSurveyPreviewById(${Number(item.id)})">
+                        <div>
+                            <div class="survey-meta">${escapeHtml(dateText)}</div>
+                            <div class="survey-summary">${escapeHtml(summary)}</div>
+                        </div>
+                        <button class="survey-delete-btn" onclick="event.stopPropagation(); deleteSurveyRecord(${Number(item.id)})">삭제</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function normalizeSurveyValue(value, fallback = '-') {
+            const text = String(value ?? '').trim();
+            return text ? text : fallback;
+        }
+
+        function normalizeSurveySymptoms(survey) {
+            const symptoms = Array.isArray(survey?.symptoms) ? survey.symptoms.filter(Boolean) : [];
+            return symptoms.length ? symptoms : [];
+        }
+
+        function openSurveyPreviewById(surveyId) {
+            const target = (surveyRecords || []).find(item => Number(item.id) === Number(surveyId));
+            if (!target) return;
+            openSurveyPreviewModal(target);
+        }
+
+        function openSurveyPreviewModal(record) {
+            const overlay = document.getElementById('survey-overlay');
+            const body = document.getElementById('survey-preview-body');
+            if (!overlay || !body) return;
+
+            const survey = record?.survey || {};
+            const createdAt = formatShortDateTime(record?.created_at);
+            const symptoms = normalizeSurveySymptoms(survey);
+            const symptomHtml = symptoms.length
+                ? `<div class="survey-symptom-list">${symptoms.map((item) => `<div class="survey-symptom-item">${escapeHtml(item)}</div>`).join('')}</div>`
+                : '<div class="survey-empty">선택한 증상이 없습니다.</div>';
+
+            body.innerHTML = `
+                <div class="survey-grid">
+                    <div class="survey-card">
+                        <h3>👤 기본 정보</h3>
+                        <div class="survey-row"><div class="survey-label">작성 시각</div><div class="survey-value">${escapeHtml(createdAt)}</div></div>
+                        <div class="survey-row"><div class="survey-label">나이</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.age ? `${survey.age}세` : ''))}</div></div>
+                        <div class="survey-row"><div class="survey-label">성별</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.gender))}</div></div>
+                        <div class="survey-row"><div class="survey-label">안경/렌즈</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.wearing))}</div></div>
+                    </div>
+                    <div class="survey-card">
+                        <h3>🏥 병력 및 생활 습관</h3>
+                        <div class="survey-row"><div class="survey-label">기저질환</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.conditions, '기록 없음'))}</div></div>
+                        <div class="survey-row"><div class="survey-label">수술 이력</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.surgery_history, '기록 없음'))}</div></div>
+                        <div class="survey-row"><div class="survey-label">흡연</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.smoking))}</div></div>
+                        <div class="survey-row"><div class="survey-label">음주 빈도</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.drinking))}</div></div>
+                        <div class="survey-row"><div class="survey-label">기타 메모</div><div class="survey-value">${escapeHtml(normalizeSurveyValue(survey.other_notes, '기록 없음'))}</div></div>
+                    </div>
+                </div>
+                <div class="survey-card" style="margin-top:6px;">
+                    <h3>👁️ 현재 안구 증상</h3>
+                    ${symptomHtml}
+                </div>
+            `;
+
+            overlay.style.display = 'flex';
+        }
+
+        function closeSurveyPreviewModal(event) {
+            if (event && event.target && event.target.id !== 'survey-overlay') {
+                return;
+            }
+            const overlay = document.getElementById('survey-overlay');
+            const body = document.getElementById('survey-preview-body');
+            if (overlay) overlay.style.display = 'none';
+            if (body) body.innerHTML = '';
+        }
+
+        function parseDateToMs(value) {
+            if (!value) return 0;
+            const parsed = Date.parse(String(value).replace(' ', 'T'));
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function mergeAnalyses(baseAnalysis, nextAnalysis) {
+            const base = baseAnalysis || {};
+            const next = nextAnalysis || {};
+            return {
+                ...base,
+                ...next,
+                left_eye: base.left_eye || next.left_eye || null,
+                right_eye: base.right_eye || next.right_eye || null,
+                guide: base.guide || next.guide || null
+            };
+        }
+
+        function addRecordEyesToSession(session, record) {
+            const analysis = record?.analysis || {};
+
+            if (!session.eyes.L && analysis.left_eye) {
+                session.eyes.L = {
+                    image_url: record.image_url,
+                    bbox: analysis.left_eye.bbox || null,
+                    record
+                };
+            }
+            if (!session.eyes.R && analysis.right_eye) {
+                session.eyes.R = {
+                    image_url: record.image_url,
+                    bbox: analysis.right_eye.bbox || null,
+                    record
+                };
+            }
+
+            session.analysis = mergeAnalyses(session.analysis, analysis);
+            session.records.push(record);
+        }
+
+        function hasLeftEye(record) {
+            return !!record?.analysis?.left_eye;
+        }
+
+        function hasRightEye(record) {
+            return !!record?.analysis?.right_eye;
+        }
+
+        function hasBothEyes(record) {
+            return hasLeftEye(record) && hasRightEye(record);
+        }
+
+        function isComplementaryPair(recordA, recordB) {
+            const aL = hasLeftEye(recordA);
+            const aR = hasRightEye(recordA);
+            const bL = hasLeftEye(recordB);
+            const bR = hasRightEye(recordB);
+            return (aL && !aR && !bL && bR) || (!aL && aR && bL && !bR);
+        }
+
+        function makeSessionFromRecord(record) {
+            const session = {
+                created_at: record?.created_at || null,
+                records: [],
+                analysis: {},
+                eyes: { L: null, R: null }
+            };
+            addRecordEyesToSession(session, record);
+
+            return session;
+        }
+
+        function buildHistorySessions(records) {
+            const sessions = [];
+            const maxMergeGapMs = 3 * 60 * 1000;
+
+            for (let index = 0; index < records.length; index += 1) {
+                const record = records[index];
+
+                // 눈 데이터가 전혀 없는 레코드는 세션에 포함하지 않음
+                if (!hasLeftEye(record) && !hasRightEye(record)) continue;
+
+                const session = makeSessionFromRecord(record);
+
+                const hasBothInCurrentRecord = hasBothEyes(record);
+                if (!hasBothInCurrentRecord && index + 1 < records.length) {
+                    const next = records[index + 1];
+                    const timeGap = Math.abs(parseDateToMs(record.created_at) - parseDateToMs(next.created_at));
+                    if (timeGap <= maxMergeGapMs && isComplementaryPair(record, next)) {
+                        addRecordEyesToSession(session, next);
+                        index += 1;
+                    }
+                }
+
+                sessions.push(session);
+            }
+
+            return sessions;
+        }
+
+        function getSessionEyeRecord(session, side) {
+            const eye = side === 'R' ? session?.eyes?.R : session?.eyes?.L;
+            return eye?.record || null;
+        }
+
+        function selectPreviewBaseSessions(sessions) {
+            const list = Array.isArray(sessions) ? sessions : [];
+            return {
+                current: list[0] || null,
+                past: list[1] || null
+            };
+        }
+
+        function setBadgeText(id, label) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = label;
+        }
+
+        async function applyHistoryToUI(records) {
+            historySessions = buildHistorySessions(records);
+            const previewBase = selectPreviewBaseSessions(historySessions);
+            const currSession = previewBase.current;
+            const pastSession = previewBase.past;
+
+            // previewSlots에는 session eye 객체 {image_url, bbox, record} 를 그대로 저장
+            previewSlots = {
+                current: {
+                    L: currSession?.eyes?.L || null,
+                    R: currSession?.eyes?.R || null
+                },
+                past: {
+                    L: pastSession?.eyes?.L || null,
+                    R: pastSession?.eyes?.R || null
+                }
+            };
+
+            const emptyCurrent = 'https://via.placeholder.com/200x150/e2e8f0/64748b?text=No+Current';
+            const emptyPast = 'https://via.placeholder.com/200x150/e2e8f0/64748b?text=No+Past';
+            document.getElementById('img-curr-L').src = emptyCurrent;
+            document.getElementById('img-curr-R').src = emptyCurrent;
+            document.getElementById('img-past-L').src = emptyPast;
+            document.getElementById('img-past-R').src = emptyPast;
+
+            setBadgeText('badge-curr-L', '왼쪽 눈');
+            setBadgeText('badge-curr-R', '오른쪽 눈');
+            setBadgeText('badge-past-L', '왼쪽 눈');
+            setBadgeText('badge-past-R', '오른쪽 눈');
+
+            // sessions 기반 resolveSessionEyeImage 사용 → L/R 병합이 이미 반영됨
+            const currLeft  = await resolveSessionEyeImage(currSession, 'L');
+            const currRight = await resolveSessionEyeImage(currSession, 'R');
+            const pastLeft  = await resolveSessionEyeImage(pastSession, 'L');
+            const pastRight = await resolveSessionEyeImage(pastSession, 'R');
+
+            document.getElementById('img-curr-L').src = currLeft  || emptyCurrent;
+            document.getElementById('img-curr-R').src = currRight || emptyCurrent;
+            document.getElementById('img-past-L').src = pastLeft  || emptyPast;
+            document.getElementById('img-past-R').src = pastRight || emptyPast;
+
+            renderGuide(currSession ? currSession.analysis : null);
+            renderRednessGraph(currSession ? currSession.analysis : null, pastSession ? pastSession.analysis : null);
+            renderAllHistoryList(historySessions);
+            renderRednessTrend(records);
+            renderHealthMetricTrend(records);
+        }
+
+        async function resolveSessionEyeImage(session, side) {
+            if (!session) return '';
+            const eye = side === 'L' ? session.eyes.L : session.eyes.R;
+            if (!eye || !eye.image_url) return '';
+
+            if (eye.bbox && Array.isArray(eye.bbox) && eye.bbox.length === 4) {
+                try {
+                    return await buildCroppedEyeDataUrl(eye.image_url, eye.bbox);
+                } catch (error) {
+                    return eye.image_url;
+                }
+            }
+
+            return eye.image_url;
+        }
+
+        async function resolveRecordEyeImage(record, side) {
+            if (!record || !record.image_url) return '';
+            const sideKey = side === 'R' ? 'right_eye' : 'left_eye';
+            if (!record?.analysis?.[sideKey]) return '';
+
+            const bbox = getEyeBBox(record.analysis || {}, side);
+            if (!bbox) return record.image_url;
+
+            try {
+                return await buildCroppedEyeDataUrl(record.image_url, bbox);
+            } catch (error) {
+                return record.image_url;
+            }
+        }
+
+        function formatShortDateTime(createdAt) {
+            if (!createdAt) return '-';
+            const [datePart, timePart = ''] = String(createdAt).split(' ');
+            const shortDate = datePart.replace(/-/g, '.').slice(2);
+            const shortTime = timePart.slice(0, 5);
+            return `${shortDate} ${shortTime}`.trim();
+        }
+
+        function readNumber(value) {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : null;
+        }
+
+        function clampPercent(value) {
+            const safe = Number(value || 0);
+            return Math.max(0, Math.min(100, safe));
+        }
+
+        function getTopDiseaseText(analysis) {
+            const left = analysis?.left_eye || null;
+            const right = analysis?.right_eye || null;
+            const candidates = [left, right].filter(Boolean);
+            if (!candidates.length) return '분석 정보 없음';
+
+            let top = null;
+            for (const item of candidates) {
+                const conf = Number(item.confidence || 0);
+                if (!top || conf > Number(top.confidence || 0)) {
+                    top = item;
+                }
+            }
+
+            if (!top) return '분석 정보 없음';
+            const confText = Number(top.confidence || 0).toFixed(1);
+            return `${top.disease || '미확인'} (${confText}%)`;
+        }
+
+        function renderAllHistoryList(sessions) {
+            const target = document.getElementById('all-history-list');
+            if (!sessions || !sessions.length) {
+                target.innerHTML = '<div style="font-size:0.85rem; color:#64748b;">저장된 과거 기록이 없습니다.</div>';
+                return;
+            }
+
+            target.innerHTML = sessions.map((session, index) => {
+                const dateText = formatShortDateTime(session.created_at);
+                const desc = getTopDiseaseText(session.analysis || {});
+                return `
+                    <div class="history-item">
+                        <div class="history-date">${dateText}</div>
+                        <div class="history-desc">${desc}</div>
+                        <button class="history-view-btn" onclick="viewHistoryImage(${index}, 'L')">좌안</button>
+                        <button class="history-view-btn right" onclick="viewHistoryImage(${index}, 'R')">우안</button>
+                        <button class="history-delete-btn" onclick="deleteHistorySession(${index})">삭제</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function requestDeleteConfirm(message) {
+            return showConfirm(message, { confirmText: '삭제', cancelText: '취소', hideCancel: false });
+        }
+
+        function showConfirm(message, options = {}) {
+            return new Promise((resolve) => {
+                const toast = document.getElementById('confirm-toast');
+                const msgEl = document.getElementById('confirm-toast-message');
+                const okBtn = document.getElementById('confirm-toast-ok');
+                const cancelBtn = document.getElementById('confirm-toast-cancel');
+
+                if (!toast || !msgEl || !okBtn || !cancelBtn) {
+                    if (options.hideCancel) {
+                        window.alert(message);
+                        resolve(true);
+                    } else {
+                        resolve(window.confirm(message));
+                    }
+                    return;
+                }
+
+                const confirmText = options.confirmText || '확인';
+                const cancelText = options.cancelText || '취소';
+                const hideCancel = !!options.hideCancel;
+
+                msgEl.textContent = message;
+                okBtn.textContent = confirmText;
+                cancelBtn.textContent = cancelText;
+                cancelBtn.style.display = hideCancel ? 'none' : 'inline-block';
+
+                toast.classList.add('show');
+
+                const cleanup = (result) => {
+                    toast.classList.remove('show');
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    resolve(result);
+                };
+
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+            });
+        }
+
+        async function showAlert(message) {
+            await showConfirm(message, { confirmText: '확인', hideCancel: true });
+        }
+
+        async function deleteHistorySession(index) {
+            const session = historySessions[index] || null;
+            if (!session || !Array.isArray(session.records) || !session.records.length) {
+                return;
+            }
+
+            const dateText = formatShortDateTime(session.created_at);
+            const safeDateText = (dateText && dateText !== '-') ? dateText : '해당 시점';
+            const ok = await requestDeleteConfirm(`${safeDateText}에 촬영한 사진과 분석 결과를 정말 삭제할까요?`);
+            if (!ok) return;
+
+            const uniqueIds = [...new Set(session.records.map(item => Number(item.id)).filter(Number.isFinite))];
+            if (!uniqueIds.length) return;
+
+            try {
+                for (const recordId of uniqueIds) {
+                    const res = await fetch(`/api/history/${recordId}?user_id=${encodeURIComponent(activeUserId)}`, {
+                        method: 'DELETE'
+                    });
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data.message || `기록 삭제 실패 (id=${recordId})`);
+                    }
+                }
+
+                await loadHistory(activeUserId);
+                await showAlert('검사 기록이 삭제되었습니다.');
+            } catch (error) {
+                console.error('[history delete error]', error);
+                await showAlert(`검사 기록 삭제 실패: ${error.message || error}`);
+            }
+        }
+
+        async function deleteSurveyRecord(surveyId) {
+            const target = (surveyRecords || []).find(item => Number(item.id) === Number(surveyId));
+            const dateText = formatShortDateTime(target?.created_at);
+            const safeDateText = (dateText && dateText !== '-') ? dateText : '해당 시점';
+            const ok = await requestDeleteConfirm(`${safeDateText}에 작성한 설문을 정말 삭제할까요?`);
+            if (!ok) return;
+
+            try {
+                const res = await fetch(`/api/survey/${Number(surveyId)}?user_id=${encodeURIComponent(activeUserId)}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.status !== 'ok') {
+                    throw new Error(data.message || '설문 삭제 실패');
+                }
+
+                await loadSurveyHistory(activeUserId);
+                await showAlert('설문 기록이 삭제되었습니다.');
+            } catch (error) {
+                console.error('[survey delete error]', error);
+                await showAlert(`설문 삭제 실패: ${error.message || error}`);
+            }
+        }
+
+        function openReportPdfModal(pdfUrl = '/report/pdf') {
+            const overlay = document.getElementById('pdf-overlay');
+            const frame = document.getElementById('pdf-frame');
+            if (!overlay || !frame || !pdfUrl) return;
+            frame.src = pdfUrl;
+            overlay.style.display = 'flex';
+        }
+
+        function closeReportPdfModal(event) {
+            if (event && event.target && event.target.id !== 'pdf-overlay') {
+                return;
+            }
+            const overlay = document.getElementById('pdf-overlay');
+            const frame = document.getElementById('pdf-frame');
+            if (overlay) overlay.style.display = 'none';
+            if (frame) frame.src = 'about:blank';
+        }
+
+        async function requestReportShare(sendKakao) {
+            const res = await fetch('/api/report/share', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: activeUserId,
+                    send_kakao: !!sendKakao
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || '보고서 생성 실패');
+            }
+            return data;
+        }
+
+        // m_report 페이지 "보고서" 버튼 동작
+        // - 최신 세션 기준 보고서 생성
+        // - 생성 완료 후 report_pdf.html을 모달 iframe으로 표시
+        async function generateShareReport() {
+            const button = document.getElementById('btn-share-report');
+            const originalText = button ? button.textContent : '📄 보고서 발행';
+
+            try {
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = '보고서 생성 중...';
+                }
+
+                await requestReportShare(false);
+
+                openReportPdfModal('/report/pdf');
+
+                await showAlert('보고서가 생성되었습니다. 미리보기 창에서 확인해 주세요.');
+            } catch (error) {
+                await showAlert(`보고서 처리 실패: ${error.message || error}`);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+        }
+
+        async function sendReportToKakao() {
+            const button = document.getElementById('btn-send-kakao');
+            const originalText = button ? button.textContent : '💬 카카오로 보내기';
+
+            try {
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = '카카오 전송 중...';
+                }
+
+                const data = await requestReportShare(true);
+
+                if (data.kakao_sent) {
+                    await showAlert('보고서 생성 완료 및 카카오톡 전송 성공');
+                } else if (data.kakao_error) {
+                    await showAlert(`보고서는 생성되었습니다.\n카카오 전송 실패: ${data.kakao_error}`);
+                } else {
+                    await showAlert('보고서는 생성되었지만 카카오 전송 결과를 확인할 수 없습니다.');
+                }
+            } catch (error) {
+                await showAlert(`카카오 전송 처리 실패: ${error.message || error}`);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+        }
+
+        function renderLineChart(svgId, labels, datasets, options = {}) {
+            const svg = document.getElementById(svgId);
+            if (!svg) return;
+
+            const width = 620;
+            const height = 180;
+            const padding = { top: 14, right: 14, bottom: 24, left: 36 };
+            const plotWidth = width - padding.left - padding.right;
+            const plotHeight = height - padding.top - padding.bottom;
+
+            const hasPoints = datasets.some(ds => (ds.values || []).some(v => v !== null && Number.isFinite(Number(v))));
+            if (!labels.length || !hasPoints) {
+                svg.innerHTML = `<text x="${width/2}" y="${height/2}" text-anchor="middle" fill="#64748b" font-size="12">라인 차트 데이터 부족</text>`;
+                return;
+            }
+
+            const allValues = datasets
+                .flatMap(ds => ds.values || [])
+                .map(v => Number(v))
+                .filter(v => Number.isFinite(v));
+
+            const yMin = Number.isFinite(options.yMin) ? options.yMin : 0;
+            const dynamicMax = allValues.length ? Math.max(...allValues) : 1;
+            const yMax = Number.isFinite(options.yMax)
+                ? options.yMax
+                : Math.max(dynamicMax * 1.15, 1);
+
+            const xStep = labels.length > 1 ? plotWidth / (labels.length - 1) : 0;
+            const mapX = (index) => padding.left + (xStep * index);
+            const mapY = (value) => {
+                const safe = Number(value);
+                const ratio = (safe - yMin) / Math.max(1e-9, (yMax - yMin));
+                return padding.top + (plotHeight * (1 - Math.max(0, Math.min(1, ratio))));
+            };
+
+            const gridLines = [0, 0.25, 0.5, 0.75, 1].map(r => {
+                const y = padding.top + plotHeight * r;
+                return `<line x1="${padding.left}" y1="${y.toFixed(1)}" x2="${(width-padding.right).toFixed(1)}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
+            }).join('');
+
+            const xTicks = labels.map((label, idx) => {
+                if (labels.length > 10 && (idx % Math.ceil(labels.length / 8) !== 0) && idx !== labels.length - 1) {
+                    return '';
+                }
+                const x = mapX(idx);
+                return `<text x="${x.toFixed(1)}" y="${(height-8)}" text-anchor="middle" font-size="10" fill="#64748b">${label}</text>`;
+            }).join('');
+
+            const seriesMarkup = datasets.map(ds => {
+                const points = (ds.values || []).map((v, idx) => {
+                    if (v === null || v === undefined || !Number.isFinite(Number(v))) return null;
+                    return { x: mapX(idx), y: mapY(Number(v)), v: Number(v) };
+                });
+
+                const polylinePoints = points
+                    .filter(Boolean)
+                    .map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+                    .join(' ');
+
+                const circles = points
+                    .filter(Boolean)
+                    .map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.8" fill="${ds.color}"><title>${(ds.name || '')}: ${p.v.toFixed(3)}</title></circle>`)
+                    .join('');
+
+                if (!polylinePoints) return '';
+                return `
+                    <polyline fill="none" stroke="${ds.color}" stroke-width="2.2" points="${polylinePoints}" />
+                    ${circles}
+                `;
+            }).join('');
+
+            svg.innerHTML = `
+                <rect x="0" y="0" width="${width}" height="${height}" fill="#f8fafc" rx="8" ry="8"></rect>
+                ${gridLines}
+                <line x1="${padding.left}" y1="${(height-padding.bottom)}" x2="${width-padding.right}" y2="${(height-padding.bottom)}" stroke="#94a3b8" stroke-width="1" />
+                <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height-padding.bottom}" stroke="#94a3b8" stroke-width="1" />
+                ${seriesMarkup}
+                ${xTicks}
+            `;
+        }
+
+        function renderRednessTrend(records) {
+            const target = document.getElementById('redness-trend-rows');
+            if (!records || records.length < 2) {
+                target.innerHTML = '<div style="font-size:0.9rem; color:#64748b; margin-top:8px;">최소 2회 이상 기록이 있어야 추이를 볼 수 있습니다.</div>';
+                renderLineChart('redness-line-chart', [], []);
+                return;
+            }
+
+            const chronological = [...records].reverse();
+            const rows = chronological.map((record) => {
+                const analysis = record.analysis || {};
+                const left = readNumber(analysis?.left_eye?.redness);
+                const right = readNumber(analysis?.right_eye?.redness);
+                const leftPct = clampPercent((left || 0) * 350);
+                const rightPct = clampPercent((right || 0) * 350);
+
+                return `
+                    <div class="trend-row">
+                        <div class="trend-date">${formatShortDateTime(record.created_at)}</div>
+                        <div class="trend-metric">
+                            <span class="trend-label">L</span>
+                            <div class="trend-track"><div class="trend-fill-left" style="width:${leftPct.toFixed(1)}%"></div></div>
+                            <span class="trend-value">${left !== null ? left.toFixed(3) : '-'}</span>
+                        </div>
+                        <div class="trend-metric">
+                            <span class="trend-label">R</span>
+                            <div class="trend-track"><div class="trend-fill-right" style="width:${rightPct.toFixed(1)}%"></div></div>
+                            <span class="trend-value">${right !== null ? right.toFixed(3) : '-'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            target.innerHTML = rows.join('');
+
+            const labels = chronological.map(record => {
+                const t = formatShortDateTime(record.created_at);
+                return t.slice(0, 8);
+            });
+            const leftSeries = chronological.map(record => readNumber(record.analysis?.left_eye?.redness));
+            const rightSeries = chronological.map(record => readNumber(record.analysis?.right_eye?.redness));
+            renderLineChart('redness-line-chart', labels, [
+                { name: '좌안', color: '#3b82f6', values: leftSeries },
+                { name: '우안', color: '#ef4444', values: rightSeries }
+            ], { yMin: 0, yMax: 0.28 });
+        }
+
+        function getRiskScore(analysis) {
+            const guide = analysis?.guide || null;
+            if (guide && guide.risk_level) {
+                if (guide.risk_level === 'danger') return 90;
+                if (guide.risk_level === 'warning') return 65;
+                return 25;
+            }
+
+            const left = Number(analysis?.left_eye?.confidence || 0);
+            const right = Number(analysis?.right_eye?.confidence || 0);
+            return clampPercent(Math.max(left, right));
+        }
+
+        function getAverageRednessScore(analysis) {
+            const left = readNumber(analysis?.left_eye?.redness);
+            const right = readNumber(analysis?.right_eye?.redness);
+            const values = [left, right].filter(v => v !== null);
+            if (!values.length) return null;
+            return values.reduce((sum, value) => sum + value, 0) / values.length;
+        }
+
+        function renderHealthMetricTrend(records) {
+            const target = document.getElementById('health-metric-trend-rows');
+            if (!records || records.length < 2) {
+                target.innerHTML = '<div style="font-size:0.9rem; color:#64748b; margin-top:8px;">지표 추이를 만들기 위한 기록이 부족합니다.</div>';
+                renderLineChart('health-line-chart', [], []);
+                return;
+            }
+
+            const chronological = [...records].reverse();
+            const rows = chronological.map((record) => {
+                const analysis = record.analysis || {};
+                const riskScore = clampPercent(getRiskScore(analysis));
+                const avgRedness = getAverageRednessScore(analysis);
+                const rednessScorePct = avgRedness !== null ? clampPercent(avgRedness * 350) : 0;
+
+                return `
+                    <div class="trend-row">
+                        <div class="trend-date">${formatShortDateTime(record.created_at)}</div>
+                        <div class="trend-metric">
+                            <span class="trend-label">위험</span>
+                            <div class="trend-track"><div class="trend-fill-health" style="width:${riskScore.toFixed(1)}%"></div></div>
+                            <span class="trend-value">${riskScore.toFixed(0)}</span>
+                        </div>
+                        <div class="trend-metric">
+                            <span class="trend-label">평균</span>
+                            <div class="trend-track"><div class="trend-fill-health" style="width:${rednessScorePct.toFixed(1)}%"></div></div>
+                            <span class="trend-value">${avgRedness !== null ? avgRedness.toFixed(3) : '-'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            target.innerHTML = rows.join('');
+
+            const labels = chronological.map(record => {
+                const t = formatShortDateTime(record.created_at);
+                return t.slice(0, 8);
+            });
+            const riskSeries = chronological.map(record => clampPercent(getRiskScore(record.analysis || {})));
+            const avgRedSeries = chronological.map(record => {
+                const avg = getAverageRednessScore(record.analysis || {});
+                return avg === null ? null : clampPercent(avg * 350);
+            });
+
+            renderLineChart('health-line-chart', labels, [
+                { name: 'AI 위험도', color: '#f59e0b', values: riskSeries },
+                { name: '평균 충혈도 점수', color: '#10b981', values: avgRedSeries }
+            ], { yMin: 0, yMax: 100 });
+        }
+
+        function getEyeBBox(analysis, side) {
+            const eye = side === 'L' ? (analysis?.left_eye || null) : (analysis?.right_eye || null);
+            const bbox = eye?.bbox;
+            if (!Array.isArray(bbox) || bbox.length !== 4) {
+                return null;
+            }
+
+            const nums = bbox.map(v => Number(v));
+            if (nums.some(v => !Number.isFinite(v))) return null;
+            return nums;
+        }
+
+        function buildCroppedEyeDataUrl(imageUrl, bbox) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => {
+                    const [x1, y1, x2, y2] = bbox;
+                    const ix1 = Math.max(0, Math.floor(Math.min(x1, x2)));
+                    const iy1 = Math.max(0, Math.floor(Math.min(y1, y2)));
+                    const ix2 = Math.min(image.width, Math.ceil(Math.max(x1, x2)));
+                    const iy2 = Math.min(image.height, Math.ceil(Math.max(y1, y2)));
+                    const cropW = Math.max(1, ix2 - ix1);
+                    const cropH = Math.max(1, iy2 - iy1);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = cropW;
+                    canvas.height = cropH;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, ix1, iy1, cropW, cropH, 0, 0, cropW, cropH);
+                    resolve(canvas.toDataURL('image/jpeg', 0.92));
+                };
+                image.onerror = reject;
+                image.src = imageUrl;
+            });
+        }
+
+        async function openEyeImageFromRecord(record, side) {
+            if (!record || !record.image_url) {
+                return;
+            }
+
+            let source = record.image_url;
+            const bbox = getEyeBBox(record.analysis || {}, side);
+            if (bbox) {
+                try {
+                    source = await buildCroppedEyeDataUrl(record.image_url, bbox);
+                } catch (error) {
+                    source = record.image_url;
+                }
+            }
+
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modal-img');
+            modalImg.src = source;
+            modal.style.display = 'flex';
+        }
+
+        function getRednessLevel(redness) {
+            const value = Number(redness || 0);
+            if (value < 0.08) return { text: '정상', className: 'red-level-normal' };
+            if (value < 0.14) return { text: '경미', className: 'red-level-mild' };
+            if (value < 0.22) return { text: '심함', className: 'red-level-severe' };
+            return { text: '매우심함', className: 'red-level-very-severe' };
+        }
+
+        function makeGraphRow(title, value) {
+            const safe = Number(value || 0);
+            const level = getRednessLevel(safe);
+            const percent = Math.max(0, Math.min(100, safe * 350));
+            return `
+                <div class="graph-row">
+                    <span>${title}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:${percent.toFixed(1)}%"></div></div>
+                    <span class="${level.className}">${safe.toFixed(4)} (${level.text})</span>
+                </div>
+            `;
+        }
+
+        function renderRednessGraph(currentAnalysis, pastAnalysis) {
+            const graph = document.getElementById('redness-graph');
+            const currLeft = currentAnalysis?.left_eye?.redness;
+            const currRight = currentAnalysis?.right_eye?.redness;
+            const pastLeft = pastAnalysis?.left_eye?.redness;
+            const pastRight = pastAnalysis?.right_eye?.redness;
+
+            const rows = [];
+            if (typeof currLeft === 'number') rows.push(makeGraphRow('현재 좌안', currLeft));
+            if (typeof pastLeft === 'number') rows.push(makeGraphRow('과거 좌안', pastLeft));
+            if (typeof currRight === 'number') rows.push(makeGraphRow('현재 우안', currRight));
+            if (typeof pastRight === 'number') rows.push(makeGraphRow('과거 우안', pastRight));
+
+            graph.innerHTML = rows.length
+                ? rows.join('')
+                : '<div style="font-size:0.9rem; color:#64748b; margin-top:8px;">충혈도 비교 데이터가 부족합니다.</div>';
+        }
+
+        function renderGuide(analysis) {
+            const guideTag = document.getElementById('guide-tag');
+            const guideSummary = document.getElementById('guide-summary');
+            const deptList = document.getElementById('guide-departments');
+            const careList = document.getElementById('guide-care');
+
+            const guide = analysis && analysis.guide ? analysis.guide : null;
+            if (!guide) {
+                guideTag.classList.remove('tag-danger', 'tag-warning', 'tag-safe');
+                guideTag.classList.add('tag-warning');
+                guideTag.textContent = '가이드 데이터 없음';
+                guideSummary.textContent = '분석 결과 기반 가이드가 아직 생성되지 않았습니다. 다시 검사 후 확인해 주세요.';
+                deptList.innerHTML = '<li>일반 안과 정기 검진을 권장합니다.</li>';
+                careList.innerHTML = '<li>증상 발생 시 조기 진료를 권장합니다.</li>';
+                return;
+            }
+
+            guideTag.classList.remove('tag-danger', 'tag-warning', 'tag-safe');
+            const levelClass = guide.risk_level === 'danger'
+                ? 'tag-danger'
+                : (guide.risk_level === 'warning' ? 'tag-warning' : 'tag-safe');
+            guideTag.classList.add(levelClass);
+            guideTag.textContent = guide.tag_text || 'AI 가이드';
+            guideSummary.textContent = guide.summary || '';
+
+            const departments = Array.isArray(guide.recommended_departments) ? guide.recommended_departments : [];
+            const dailyCare = Array.isArray(guide.daily_care) ? guide.daily_care : [];
+
+            deptList.innerHTML = departments.length
+                ? departments.map(item => `<li>${item}</li>`).join('')
+                : '<li>권장 진료 과목 정보 없음</li>';
+
+            careList.innerHTML = dailyCare.length
+                ? dailyCare.map(item => `<li>${item}</li>`).join('')
+                : '<li>권장 관리 방법 정보 없음</li>';
+        }
+
+        async function viewImage(type) {
+            const side = type.endsWith('_L') ? 'L' : 'R';
+            const section = (type === 'current_L' || type === 'current_R') ? 'current' : 'past';
+            // previewSlots[section][side]는 이제 session eye 객체 {image_url, bbox, record}
+            const eye = previewSlots?.[section]?.[side] || null;
+            if (!eye?.record) return;
+            await openEyeImageFromRecord(eye.record, side);
+        }
+
+        async function viewHistoryImage(index, side) {
+            const session = historySessions[index] || null;
+            const eye = side === 'R' ? session?.eyes?.R : session?.eyes?.L;
+            if (!eye || !eye.record) return;
+            await openEyeImageFromRecord(eye.record, side || 'L');
+        }
+
+        (function () {
+            const root = document.documentElement;
+            function currentTheme() {
+                const t = root.getAttribute('data-theme');
+                return (t === 'dark' || t === 'light') ? t : 'light';
+            }
+            function applyTheme(theme, persist) {
+                root.setAttribute('data-theme', theme);
+                if (persist) {
+                    try { localStorage.setItem('theme', theme); } catch (e) {}
+                }
+                const btn = document.getElementById('global-theme-toggle');
+                if (!btn) return;
+                const icon = btn.querySelector('[data-role="icon"]');
+                const label = btn.querySelector('[data-role="label"]');
+                if (theme === 'dark') {
+                    if (icon) icon.textContent = '☀️';
+                    if (label) label.textContent = '라이트 모드';
+                } else {
+                    if (icon) icon.textContent = '🌙';
+                    if (label) label.textContent = '다크 모드';
+                }
+            }
+            applyTheme(currentTheme(), false);
+        })();
+    </script>
+
+    <script>
+        // ==========================================
+        // 유동적 반응형 레이아웃 관리
+        // ==========================================
+        function getScreenCategory() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const isLandscape = h < w;
+
+            if (w <= 380) return 'xs-phone';
+            if (w <= 480) return 'sm-phone';
+            if (w <= 768) return 'md-phone';
+            if (w <= 1024) return isLandscape ? 'tablet-landscape' : 'tablet-portrait';
+            return 'desktop';
+        }
+
+        function adjustResponsiveLayout() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const isMobileScreen = width <= 768;
+            const isLandscape = height < width;
+
+            document.documentElement.style.setProperty('--viewport-width', width + 'px');
+            document.documentElement.style.setProperty('--viewport-height', height + 'px');
+            document.documentElement.style.setProperty('--is-mobile', isMobileScreen ? '1' : '0');
+            document.documentElement.style.setProperty('--is-landscape', isLandscape ? '1' : '0');
+        }
+
+        let resizeTimeout = null;
+        let lastViewportWidth = window.innerWidth;
+        let lastViewportHeight = window.innerHeight;
+
+        function setupResponsiveListener() {
+            // 창 크기 변화 감지 (500ms 디바운싱)
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const newWidth = window.innerWidth;
+                    const newHeight = window.innerHeight;
+
+                    if (Math.abs(newWidth - lastViewportWidth) > 50 || 
+                        Math.abs(newHeight - lastViewportHeight) > 50) {
+                        lastViewportWidth = newWidth;
+                        lastViewportHeight = newHeight;
+                        adjustResponsiveLayout();
+                    }
+                }, 500);
+            }, { passive: true });
+
+            // 방향 변화 감지
+            window.addEventListener('orientationchange', () => {
+                setTimeout(() => {
+                    adjustResponsiveLayout();
+                }, 100);
+            }, { passive: true });
+
+            // 초기 레이아웃 조정
+            setTimeout(adjustResponsiveLayout, 100);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupResponsiveListener);
+        } else {
+            setupResponsiveListener();
+        }
+
+        // ==========================================
+        // 고급 유동적 반응형 상태 관리
+        // ==========================================
+        class FluidResponsiveManager {
+            constructor() {
+                this.state = {
+                    screenCategory: getScreenCategory(),
+                    isPortrait: window.matchMedia('(orientation: portrait)').matches,
+                    isTouchDevice: window.matchMedia('(hover: none)').matches,
+                    darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
+                    reduceMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+                    highContrast: window.matchMedia('(prefers-contrast: more)').matches,
+                };
+
+                this.observers = [];
+                this.setupObservers();
+                this.applyInitialState();
+            }
+
+            setupObservers() {
+                window.matchMedia('(orientation: portrait)').addEventListener('change', (e) => {
+                    this.state.isPortrait = e.matches;
+                    this.notifyObservers('orientation');
+                });
+
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                    this.state.darkMode = e.matches;
+                    this.notifyObservers('colorScheme');
+                });
+
+                window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+                    this.state.reduceMotion = e.matches;
+                    this.notifyObservers('motion');
+                });
+
+                window.matchMedia('(prefers-contrast: more)').addEventListener('change', (e) => {
+                    this.state.highContrast = e.matches;
+                    this.notifyObservers('contrast');
+                });
+            }
+
+            applyInitialState() {
+                const bodyEl = document.body;
+                
+                if (this.state.isTouchDevice) {
+                    bodyEl.classList.add('touch-device');
+                } else {
+                    bodyEl.classList.add('mouse-device');
+                }
+
+                if (this.state.isPortrait) {
+                    bodyEl.classList.add('portrait-mode');
+                } else {
+                    bodyEl.classList.add('landscape-mode');
+                }
+
+                if (this.state.reduceMotion) {
+                    bodyEl.classList.add('disable-animations');
+                }
+            }
+
+            notifyObservers(changeType) {
+                this.observers.forEach(obs => obs(changeType, this.state));
+            }
+
+            subscribe(callback) {
+                this.observers.push(callback);
+                return () => {
+                    this.observers = this.observers.filter(obs => obs !== callback);
+                };
+            }
+
+            getState() {
+                return { ...this.state };
+            }
+        }
+
+        const fluidManager = new FluidResponsiveManager();
+
+        // ==========================================
+        // 유동적 레이아웃 계산 함수
+        // ==========================================
+        function calculateFluidDimensions() {
+            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+            const dimensions = {
+                vw,
+                vh,
+                isMobile: vw <= 768,
+                isTablet: vw > 768 && vw <= 1024,
+                isDesktop: vw > 1024,
+                isLandscape: vh < vw,
+                isTall: vh > 1200,
+                isCompact: vh < 600,
+                aspectRatio: vw / vh,
+            };
+
+            return dimensions;
+        }
+
+        let layoutCheckInterval = null;
+
+        function startLayoutMonitoring() {
+            layoutCheckInterval = setInterval(() => {
+                const dims = calculateFluidDimensions();
+                document.documentElement.style.setProperty('--viewport-aspect', String(dims.aspectRatio));
+            }, 1000);
+        }
+
+        function stopLayoutMonitoring() {
+            if (layoutCheckInterval) clearInterval(layoutCheckInterval);
+        }
+
+        window.addEventListener('beforeunload', stopLayoutMonitoring);
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startLayoutMonitoring);
+        } else {
+            startLayoutMonitoring();
+        }
+    </script>
+</body>
+</html>
